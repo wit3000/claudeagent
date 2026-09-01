@@ -19,7 +19,6 @@ except ImportError:
     HAS_SPACES = False
 
 from reviewer.orchestrator import review as run_review
-from reviewer.report import render_markdown
 from reviewer.schema import ReviewReport
 
 _key = os.environ.get("GROQ_API_KEY", "")
@@ -53,6 +52,32 @@ PASS_LABELS = {
     "p2": "Прогон 2 · Логик-придира",
     "p3": "Прогон 3 · Читатель без контекста",
 }
+PASS_SHORT = {"p1": "Прогон 1", "p2": "Прогон 2", "p3": "Прогон 3"}
+
+
+def _translate_warning(w: str) -> str:
+    """Turn the orchestrator's English warnings into human Russian."""
+    import re as _re
+    m = _re.match(r"Pass (p\d) unreliable: (\d+)/(\d+) findings hallucinated", w)
+    if m:
+        pid, hall, total = m.group(1), m.group(2), m.group(3)
+        return (
+            f"{PASS_LABELS.get(pid, pid)}: модель придумала цитаты, которых нет в тексте, "
+            f"в {hall} случаях из {total}. Отброшены автоматически, но замечания этого прогона "
+            f"на этом тексте лучше перепроверять вручную."
+        )
+    m = _re.match(r"Pass (p\d): (\d+) findings excluded as hallucinated", w)
+    if m:
+        pid, hall = m.group(1), m.group(2)
+        return (
+            f"{PASS_LABELS.get(pid, pid)}: {hall} замечание(-й) отброшено как галлюцинация "
+            f"(цитата отсутствует в исходнике). На итог не влияет."
+        )
+    m = _re.match(r"Pass (p\d) failed: (.+)", w)
+    if m:
+        pid, reason = m.group(1), m.group(2)
+        return f"{PASS_LABELS.get(pid, pid)} упал: {reason}"
+    return w
 
 
 def _fmt_passes(report: ReviewReport) -> str:
@@ -114,7 +139,7 @@ def _fmt_report(report: ReviewReport) -> str:
         out.append("## ⚠️ Предупреждения")
         out.append("")
         for w in report.warnings:
-            out.append(f"- {w}")
+            out.append(f"- {_translate_warning(w)}")
         out.append("")
 
     out.append("## Статус прогонов")
@@ -154,17 +179,17 @@ def _fmt_report(report: ReviewReport) -> str:
 
 def review_text(text: str, text_id: str, progress=gr.Progress()):
     if not text or not text.strip():
-        return "⚠️ Пустой текст.", ""
+        return "⚠️ Пустой текст."
     if len(text) > MAX_TEXT_CHARS:
-        return f"⚠️ Слишком длинный текст: {len(text)} символов (максимум {MAX_TEXT_CHARS}).", ""
+        return f"⚠️ Слишком длинный текст: {len(text)} символов (максимум {MAX_TEXT_CHARS})."
     if not os.environ.get("GROQ_API_KEY"):
-        return "⚠️ Сервер не настроен: не задан GROQ_API_KEY.", ""
+        return "⚠️ Сервер не настроен: не задан GROQ_API_KEY."
 
     tid = text_id.strip() or "adhoc"
     progress(0.1, desc="Запускаю три параллельных прогона…")
     report = asyncio.run(run_review(text, tid))
     progress(1.0, desc="Готово")
-    return _fmt_report(report), render_markdown(report)
+    return _fmt_report(report)
 
 
 SAMPLE = """Компания X запустила продукт в 2019 году. За первый год они привлекли 50 000 пользователей.
@@ -198,9 +223,7 @@ with gr.Blocks(title="Проверка текста в 3 прогона") as dem
             btn = gr.Button("Проверить в 3 прогона", variant="primary", size="lg")
         with gr.Column(scale=3):
             report_md = gr.Markdown(label="Отчёт")
-            with gr.Accordion("Сырой Markdown (для копирования в документы)", open=False):
-                raw_md = gr.Textbox(label="", lines=20, show_copy_button=True)
-    btn.click(review_text, [text_in, text_id_in], [report_md, raw_md])
+    btn.click(review_text, [text_in, text_id_in], [report_md])
 
 
 if __name__ == "__main__":
