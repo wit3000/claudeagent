@@ -3,8 +3,9 @@ title: Triple-Pass Text Reviewer
 emoji: 🔍
 colorFrom: blue
 colorTo: gray
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: "4.44.0"
+app_file: app.py
 pinned: false
 ---
 
@@ -24,34 +25,32 @@ pinned: false
 2. Отправь пользователю корневую ссылку — они увидят форму.
 3. После проверки каждый отчёт получает постоянный URL вида `https://ваш-домен/r/<job_id>` и кнопку **Copy share link** — этой ссылкой можно делиться, отчёт лежит в SQLite и переживает рестарт.
 
-## Деплой на Hugging Face Spaces (бесплатно, без карты)
+## Деплой на Hugging Face Spaces (Gradio SDK, бесплатно, без карты)
 
 1. На [huggingface.co](https://huggingface.co) → **New Space**.
-   - Owner: твой аккаунт.
-   - Space name: любое (например `triple-pass-reviewer`).
-   - License: любая (`mit` подойдёт).
-   - **SDK: Docker** → **Blank**.
-   - Hardware: `CPU basic` (бесплатный).
-   - Visibility: **Private** (чтобы никто чужой не жёг твой API-ключ).
-2. Space создан → открой вкладку **Settings** → **Variables and secrets** → **New secret**:
+   - Space name: например `triple-pass-reviewer`.
+   - License: `mit` подойдёт.
+   - **SDK: Gradio** → **Blank**.
+   - Hardware: `CPU basic` (бесплатный). Если он недоступен — подойдёт и `ZeroGPU` (тоже бесплатный): наш сервис не использует GPU, только вызывает Anthropic API, так что GPU-квота не тратится.
+   - Visibility: **Private** — важно, иначе твой API-ключ будут жечь другие.
+2. Space создан → **Settings** → **Variables and secrets** → **New secret**:
    - Name: `ANTHROPIC_API_KEY` · Value: твой ключ.
-   - (опционально) `APP_PASSWORD` — тогда убери `PUBLIC_MODE` (см. ниже). Для приватного Space это не обязательно: доступ уже ограничен твоим HF-аккаунтом.
-3. Залей код из этого репозитория в Space. Проще всего через git:
+3. Залей файлы. Проще всего через git:
    ```bash
-   git clone https://huggingface.co/spaces/<твой-user>/triple-pass-reviewer hf-space
+   git clone https://huggingface.co/spaces/<твой-hf-user>/triple-pass-reviewer hf-space
    cd hf-space
-   # скопировать содержимое этого репозитория (кроме .git)
-   cp -r /path/to/claudeagent/{Dockerfile,pyproject.toml,README.md,src} .
+   # скопировать нужные файлы из этого репо:
+   cp /path/to/claudeagent/{app.py,requirements.txt,README.md} .
+   cp -r /path/to/claudeagent/src .
    git add -A && git commit -m "init" && git push
    ```
-   Или через UI: **Files** → **Add file** → перетащить `Dockerfile`, `pyproject.toml`, `README.md`, папку `src/`.
-4. HF автоматически соберёт Docker-образ (~2 минуты, статус в **Logs**). Готовый URL: `https://<твой-user>-triple-pass-reviewer.hf.space`.
+   Или через UI: **Files** → **Add file** → перетащить `app.py`, `requirements.txt`, `README.md` и папку `src/`.
+4. HF автоматически поставит зависимости и запустит Gradio (~1–2 минуты, статус в **Logs**).
+   Готовый URL: `https://<твой-hf-user>-triple-pass-reviewer.hf.space`.
 
-**Важно про приватные Spaces:** ссылка работает только когда ты залогинен на HF. Для тебя одного — идеально.
+**Приватный Space:** ссылка работает только пока ты залогинен на HF. Для «только я» — то, что нужно.
 
-**Про хранилище:** на бесплатном тарифе постоянного диска нет — при перезапуске Space (например, после сна) SQLite сбрасывается, история проверок теряется. Сами проверки работают нормально. Для персонального теста этого достаточно.
-
-**Про засыпание:** после ~48ч без активности Space засыпает, при заходе просыпается за ~30 секунд. Ключ не тратится.
+**Про засыпание:** после ~48ч бездействия Space засыпает, при заходе просыпается за ~30 секунд. Ключ не тратится.
 
 ## Деплой на любой VPS
 
