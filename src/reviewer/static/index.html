@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triple-Pass Text Reviewer</title>
+<link rel="stylesheet" href="/static/styles.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+</head>
+<body>
+<div class="wrap" x-data="reviewer()" x-init="loadHistory()">
+  <h1>Triple-Pass Text Reviewer</h1>
+  <p class="sub">Три независимых прогона · консенсус · защита от галлюцинаций</p>
+
+  <section class="card">
+    <h2>New review</h2>
+    <label>Text ID (optional)
+      <input type="text" x-model="textId" placeholder="auto">
+    </label>
+    <textarea x-model="text" rows="14" placeholder="Вставьте текст для проверки..."></textarea>
+    <button @click="submit()" :disabled="busy || !text.trim()">
+      <span x-show="!busy">Run 3-pass review</span>
+      <span x-show="busy">Running…</span>
+    </button>
+    <div class="err" x-show="error" x-text="error"></div>
+  </section>
+
+  <section class="card" x-show="report">
+    <h2>Report — <span x-text="report?.text_id"></span></h2>
+    <div class="meta">
+      Model <code x-text="report?.model_id"></code> ·
+      Pass version <code x-text="report?.pass_version"></code>
+    </div>
+
+    <div class="warnings" x-show="report?.warnings?.length">
+      <template x-for="w in report.warnings" :key="w">
+        <div class="warn" x-text="w"></div>
+      </template>
+    </div>
+
+    <div class="passes">
+      <template x-for="p in report?.passes || []" :key="p.pass_id">
+        <div class="pass" :class="{failed: p.failed}">
+          <b x-text="p.pass_id"></b>
+          <span x-show="!p.failed" x-text="p.latency_ms + ' ms · ' + p.findings.length + ' findings · ' + p.hallucinated_count + ' hallucinated'"></span>
+          <span x-show="p.failed" x-text="'FAILED: ' + p.failure_reason"></span>
+        </div>
+      </template>
+    </div>
+
+    <h3>Summary</h3>
+    <ul>
+      <li>High-priority: <b x-text="high().length"></b></li>
+      <li>Low-priority: <b x-text="low().length"></b></li>
+      <li>Clean categories: <span x-text="(report?.clean_categories || []).join(', ') || '—'"></span></li>
+    </ul>
+
+    <h3>High-priority findings</h3>
+    <template x-for="(it, i) in high()" :key="i">
+      <details class="finding high" open>
+        <summary>
+          [P<span x-text="it.paragraph"></span><span x-show="it.sentence">, s<span x-text="it.sentence"></span></span>]
+          · <b x-text="it.category"></b>
+          · <span x-text="'confirmed by ' + it.confirmed_by.join(', ')"></span>
+        </summary>
+        <blockquote x-text="it.quote"></blockquote>
+        <div><b>Defects:</b>
+          <ul><template x-for="d in it.defects" :key="d"><li x-text="d"></li></template></ul>
+        </div>
+        <div x-show="it.fixes.length"><b>Fixes:</b>
+          <ul><template x-for="f in it.fixes" :key="f"><li x-text="f"></li></template></ul>
+        </div>
+      </details>
+    </template>
+    <p x-show="!high().length" class="empty">No high-priority findings.</p>
+
+    <h3>Low-priority findings</h3>
+    <template x-for="(it, i) in low()" :key="i">
+      <details class="finding low">
+        <summary>
+          [P<span x-text="it.paragraph"></span><span x-show="it.sentence">, s<span x-text="it.sentence"></span></span>]
+          · <b x-text="it.category"></b>
+          · <span x-text="'confirmed by ' + it.confirmed_by.join(', ')"></span>
+        </summary>
+        <blockquote x-text="it.quote"></blockquote>
+        <div><b>Defects:</b>
+          <ul><template x-for="d in it.defects" :key="d"><li x-text="d"></li></template></ul>
+        </div>
+        <div x-show="it.fixes.length"><b>Fixes:</b>
+          <ul><template x-for="f in it.fixes" :key="f"><li x-text="f"></li></template></ul>
+        </div>
+      </details>
+    </template>
+    <p x-show="!low().length" class="empty">No low-priority findings.</p>
+
+    <p class="downloads">
+      <a :href="'/api/report/' + jobId + '.md'">Download .md</a> ·
+      <a :href="'/api/report/' + jobId + '.json'">Download .json</a>
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    <table>
+      <thead><tr><th>Text ID</th><th>Status</th><th>High</th><th>Low</th><th>Created</th></tr></thead>
+      <tbody>
+        <template x-for="h in history" :key="h.job_id">
+          <tr @click="loadJob(h.job_id)" style="cursor:pointer">
+            <td x-text="h.text_id"></td>
+            <td x-text="h.status"></td>
+            <td x-text="h.high"></td>
+            <td x-text="h.low"></td>
+            <td x-text="h.created_at.replace('T',' ').slice(0,19)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

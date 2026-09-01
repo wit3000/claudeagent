@@ -1,0 +1,35 @@
+[project]
+name = "reviewer"
+version = "0.1.0"
+description = "Triple-pass text reviewer: three independent LLM passes with consensus."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "pydantic>=2.6",
+    "tenacity>=8.2",
+    "typer>=0.12",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlmodel>=0.0.16",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+reviewer = "reviewer.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
