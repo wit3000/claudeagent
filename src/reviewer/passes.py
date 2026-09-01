@@ -2,16 +2,18 @@
 
 PASS_VERSION = "2026-09-02"
 
-_OUTPUT_CONTRACT = """
+_FENCE = chr(96) * 3  # three backticks (avoids literal backticks in source)
+
+_OUTPUT_CONTRACT = f"""
 ## Формат ответа для оркестратора
 
-После человекочитаемого отчёта на новой строке добавь fenced JSON-блок:
+После человекочитаемого отчёта на новой строке добавь fenced JSON-блок вида:
 
-```json
-{"findings":[
-  {"quote":"...","paragraph":N,"sentence":M,"category":"...","defect":"...","fix":"..."}
-]}
-```
+{_FENCE}json
+{{"findings":[
+  {{"quote":"...","paragraph":N,"sentence":M,"category":"...","defect":"...","fix":"..."}}
+]}}
+{_FENCE}
 
 Требования к JSON-блоку:
 - `quote` должно посимвольно встречаться в исходном тексте.
