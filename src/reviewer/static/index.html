@@ -8,7 +8,7 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
 </head>
 <body>
-<div class="wrap" x-data="reviewer()" x-init="loadHistory()">
+<div class="wrap" x-data="reviewer()" x-init="init()">
   <h1>Triple-Pass Text Reviewer</h1>
   <p class="sub">Три независимых прогона · консенсус · защита от галлюцинаций</p>
 
@@ -95,7 +95,12 @@
 
     <p class="downloads">
       <a :href="'/api/report/' + jobId + '.md'">Download .md</a> ·
-      <a :href="'/api/report/' + jobId + '.json'">Download .json</a>
+      <a :href="'/api/report/' + jobId + '.json'">Download .json</a> ·
+      <button class="linkbtn" @click="copyShare()">
+        <span x-show="!copied">Copy share link</span>
+        <span x-show="copied">Copied ✓</span>
+      </button>
+      <code x-show="shareUrl" x-text="shareUrl" class="sharecode"></code>
     </p>
   </section>
 

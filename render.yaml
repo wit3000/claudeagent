@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: triple-pass-reviewer
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MODEL_ID
+        value: claude-sonnet-5
+      - key: PUBLIC_MODE
+        value: "1"
+      - key: RATE_LIMIT_PER_HOUR
+        value: "20"
+      - key: MAX_TEXT_CHARS
+        value: "20000"
+      - key: DB_PATH
+        value: /var/data/reviewer.db
+    disk:
+      name: reviewer-data
+      mountPath: /var/data
+      sizeGB: 1
