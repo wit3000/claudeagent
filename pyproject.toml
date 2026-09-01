@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Triple-pass text reviewer: three independent LLM passes with consensus."
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=0.40.0",
+    "google-genai>=0.3",
     "pydantic>=2.6",
     "tenacity>=8.2",
     "typer>=0.12",

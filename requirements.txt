@@ -1,5 +1,5 @@
 gradio>=5.9
 spaces>=0.30
-anthropic>=0.40.0
+google-genai>=0.3
 pydantic>=2.6
 tenacity>=8.2
