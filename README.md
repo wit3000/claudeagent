@@ -1,3 +1,13 @@
+---
+title: Triple-Pass Text Reviewer
+emoji: 🔍
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Triple-Pass Text Reviewer
 
 Публичный сервис: пользователь заходит по ссылке, вставляет текст, получает результаты трёх независимых LLM-проверок и может поделиться отчётом.
@@ -14,19 +24,36 @@
 2. Отправь пользователю корневую ссылку — они увидят форму.
 3. После проверки каждый отчёт получает постоянный URL вида `https://ваш-домен/r/<job_id>` и кнопку **Copy share link** — этой ссылкой можно делиться, отчёт лежит в SQLite и переживает рестарт.
 
-## Деплой на Render.com (~3 минуты)
+## Деплой на Hugging Face Spaces (бесплатно, без карты)
 
-1. Форкни репозиторий или зайди в свой (файл `render.yaml` уже в корне).
-2. На [render.com](https://render.com) → **New** → **Blueprint** → выбери репо.
-3. Render прочитает `render.yaml` и создаст веб-сервис + постоянный диск.
-4. В настройках сервиса → **Environment** → введи `ANTHROPIC_API_KEY`.
-5. Deploy. Через ~2 минуты получишь публичный URL: `https://triple-pass-reviewer.onrender.com`.
+1. На [huggingface.co](https://huggingface.co) → **New Space**.
+   - Owner: твой аккаунт.
+   - Space name: любое (например `triple-pass-reviewer`).
+   - License: любая (`mit` подойдёт).
+   - **SDK: Docker** → **Blank**.
+   - Hardware: `CPU basic` (бесплатный).
+   - Visibility: **Private** (чтобы никто чужой не жёг твой API-ключ).
+2. Space создан → открой вкладку **Settings** → **Variables and secrets** → **New secret**:
+   - Name: `ANTHROPIC_API_KEY` · Value: твой ключ.
+   - (опционально) `APP_PASSWORD` — тогда убери `PUBLIC_MODE` (см. ниже). Для приватного Space это не обязательно: доступ уже ограничен твоим HF-аккаунтом.
+3. Залей код из этого репозитория в Space. Проще всего через git:
+   ```bash
+   git clone https://huggingface.co/spaces/<твой-user>/triple-pass-reviewer hf-space
+   cd hf-space
+   # скопировать содержимое этого репозитория (кроме .git)
+   cp -r /path/to/claudeagent/{Dockerfile,pyproject.toml,README.md,src} .
+   git add -A && git commit -m "init" && git push
+   ```
+   Или через UI: **Files** → **Add file** → перетащить `Dockerfile`, `pyproject.toml`, `README.md`, папку `src/`.
+4. HF автоматически соберёт Docker-образ (~2 минуты, статус в **Logs**). Готовый URL: `https://<твой-user>-triple-pass-reviewer.hf.space`.
 
-По умолчанию `PUBLIC_MODE=1` — любой с ссылкой может отправить текст. Защита: rate-limit **20 проверок/час на IP** и **20 000 символов на текст** (правится через env `RATE_LIMIT_PER_HOUR`, `MAX_TEXT_CHARS`).
+**Важно про приватные Spaces:** ссылка работает только когда ты залогинен на HF. Для тебя одного — идеально.
 
-Если хочешь закрыть паролем: убери `PUBLIC_MODE`, добавь `APP_PASSWORD=...` — при заходе браузер спросит логин (любой) и этот пароль.
+**Про хранилище:** на бесплатном тарифе постоянного диска нет — при перезапуске Space (например, после сна) SQLite сбрасывается, история проверок теряется. Сами проверки работают нормально. Для персонального теста этого достаточно.
 
-## Деплой на Fly.io / Railway / любой VPS
+**Про засыпание:** после ~48ч без активности Space засыпает, при заходе просыпается за ~30 секунд. Ключ не тратится.
+
+## Деплой на любой VPS
 
 Есть `Dockerfile` — работает где угодно. Обязательные env:
 `ANTHROPIC_API_KEY`, `MODEL_ID` (по умолчанию `claude-sonnet-5`), `PUBLIC_MODE=1` **или** `APP_PASSWORD`. Опциональные: `RATE_LIMIT_PER_HOUR`, `MAX_TEXT_CHARS`, `DB_PATH` (должен быть на персистентном диске).
