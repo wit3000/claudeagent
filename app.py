@@ -22,10 +22,10 @@ from reviewer.orchestrator import review as run_review
 from reviewer.report import render_markdown
 from reviewer.schema import ReviewReport
 
-_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+_key = os.environ.get("GROQ_API_KEY", "")
 print(
-    f"[boot] GOOGLE_API_KEY set: {'yes' if _key else 'NO'} "
-    f"(len={len(_key)}, starts_with={_key[:6] if _key else '-'})",
+    f"[boot] GROQ_API_KEY set: {'yes' if _key else 'NO'} "
+    f"(len={len(_key)}, starts_with={_key[:5] if _key else '-'})",
     flush=True,
 )
 
@@ -98,8 +98,8 @@ def review_text(text: str, text_id: str, progress=gr.Progress()):
         return "⚠️ Empty text.", ""
     if len(text) > MAX_TEXT_CHARS:
         return f"⚠️ Too long: {len(text)} chars (max {MAX_TEXT_CHARS}).", ""
-    if not (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")):
-        return "⚠️ Server misconfigured: GOOGLE_API_KEY is not set.", ""
+    if not os.environ.get("GROQ_API_KEY"):
+        return "⚠️ Server misconfigured: GROQ_API_KEY is not set.", ""
 
     tid = text_id.strip() or "adhoc"
     progress(0.1, desc="Running 3 parallel passes...")

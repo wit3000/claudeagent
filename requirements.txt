@@ -1,5 +1,5 @@
 gradio>=5.9
 spaces>=0.30
-google-genai>=0.3
+groq>=0.11
 pydantic>=2.6
 tenacity>=8.2
