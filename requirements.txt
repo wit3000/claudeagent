@@ -1,4 +1,4 @@
-gradio>=4.44
+gradio>=5.9
 anthropic>=0.40.0
 pydantic>=2.6
 tenacity>=8.2
