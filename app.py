@@ -40,71 +40,130 @@ if HAS_SPACES:
 MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "20000"))
 
 
+CATEGORY_LABELS = {
+    "facts": "Факты",
+    "logic": "Логика",
+    "style": "Стиль",
+    "reader": "Читательский взгляд",
+}
+CATEGORY_ORDER = ["facts", "logic", "style", "reader"]
+PRIORITY_LABEL = {"high": "🔴 Высокий приоритет", "low": "🟡 Низкий приоритет"}
+PASS_LABELS = {
+    "p1": "Прогон 1 · Технический вычитчик",
+    "p2": "Прогон 2 · Логик-придира",
+    "p3": "Прогон 3 · Читатель без контекста",
+}
+
+
 def _fmt_passes(report: ReviewReport) -> str:
-    rows = []
+    rows = ["| Прогон | Статус | Задержка | Дефектов | Отброшено |",
+            "|---|---|---:|---:|---:|"]
     for p in report.passes:
+        label = PASS_LABELS.get(p.pass_id, p.pass_id)
         if p.failed:
-            rows.append(f"- **{p.pass_id}** · ❌ FAILED · {p.failure_reason}")
+            rows.append(f"| {label} | ❌ ошибка | — | — | — |")
         else:
             rows.append(
-                f"- **{p.pass_id}** · {p.latency_ms} ms · "
-                f"findings {len(p.findings)} · hallucinated {p.hallucinated_count}"
+                f"| {label} | ✅ ок | {p.latency_ms} ms | "
+                f"{len(p.findings)} | {p.hallucinated_count} |"
             )
     return "\n".join(rows)
 
 
-def _fmt_finding(it) -> str:
-    loc = f"Paragraph {it.paragraph}"
+def _fmt_finding(idx: int, it) -> str:
+    loc = f"Абзац {it.paragraph}"
     if it.sentence is not None:
-        loc += f", sentence {it.sentence}"
+        loc += f", предл. {it.sentence}"
     quote = html.escape(it.quote)
-    defects = "\n".join(f"- {html.escape(d)}" for d in it.defects)
-    fixes = "\n".join(f"- {html.escape(f)}" for f in it.fixes) if it.fixes else ""
+    confirmed = ", ".join(it.confirmed_by)
     parts = [
-        f"### [{loc}] · {it.category} · confirmed by {', '.join(it.confirmed_by)}",
+        f"**{idx}. {loc}** · подтверждено: `{confirmed}`",
+        "",
         f"> {quote}",
         "",
-        "**Defects:**",
-        defects,
+        "**В чём проблема:**",
     ]
-    if fixes:
-        parts += ["", "**Fixes:**", fixes]
+    for d in it.defects:
+        parts.append(f"- {html.escape(d)}")
+    if it.fixes:
+        parts.append("")
+        parts.append("**Как исправить:**")
+        for f in it.fixes:
+            parts.append(f"- {html.escape(f)}")
     return "\n".join(parts)
 
 
 def _fmt_report(report: ReviewReport) -> str:
+    total = len(report.consensus)
     high = [c for c in report.consensus if c.priority == "high"]
     low = [c for c in report.consensus if c.priority == "low"]
+
     out = [
-        f"### Summary",
-        f"- High-priority findings: **{len(high)}**",
-        f"- Low-priority findings: **{len(low)}**",
-        f"- Clean categories: {', '.join(report.clean_categories) or '—'}",
+        "## Итоги проверки",
         "",
-        f"### Passes",
-        _fmt_passes(report),
+        f"- Найдено дефектов всего: **{total}**",
+        f"  - 🔴 Высокий приоритет (нашли 2–3 прогона): **{len(high)}** — правь сразу.",
+        f"  - 🟡 Низкий приоритет (нашёл 1 прогон): **{len(low)}** — проверь точечно.",
     ]
+    if report.clean_categories:
+        clean_ru = ", ".join(CATEGORY_LABELS.get(c, c) for c in report.clean_categories)
+        out.append(f"- Категории без замечаний: **{clean_ru}**")
+    out.append("")
+
     if report.warnings:
-        out += ["", "### Warnings"] + [f"- ⚠️ {w}" for w in report.warnings]
-    out += ["", "### High-priority findings"]
-    out += [_fmt_finding(f) for f in high] or ["_None._"]
-    out += ["", "### Low-priority findings"]
-    out += [_fmt_finding(f) for f in low] or ["_None._"]
-    return "\n\n".join(out)
+        out.append("## ⚠️ Предупреждения")
+        out.append("")
+        for w in report.warnings:
+            out.append(f"- {w}")
+        out.append("")
+
+    out.append("## Статус прогонов")
+    out.append("")
+    out.append(_fmt_passes(report))
+    out.append("")
+
+    # Findings grouped by category, in canonical order, high before low inside.
+    by_cat: dict[str, list] = {c: [] for c in CATEGORY_ORDER}
+    for c in report.consensus:
+        by_cat.setdefault(c.category, []).append(c)
+
+    idx = 0
+    for cat in CATEGORY_ORDER:
+        items = by_cat.get(cat, [])
+        if not items:
+            continue
+        items.sort(key=lambda it: (0 if it.priority == "high" else 1,
+                                   it.paragraph, it.sentence or 0))
+        out.append(f"## {CATEGORY_LABELS[cat]}")
+        out.append("")
+        current_priority = None
+        for it in items:
+            if it.priority != current_priority:
+                current_priority = it.priority
+                out.append(f"### {PRIORITY_LABEL[current_priority]}")
+                out.append("")
+            idx += 1
+            out.append(_fmt_finding(idx, it))
+            out.append("")
+
+    if total == 0:
+        out.append("_Дефектов не обнаружено. Текст можно публиковать._")
+
+    return "\n".join(out)
 
 
 def review_text(text: str, text_id: str, progress=gr.Progress()):
     if not text or not text.strip():
-        return "⚠️ Empty text.", ""
+        return "⚠️ Пустой текст.", ""
     if len(text) > MAX_TEXT_CHARS:
-        return f"⚠️ Too long: {len(text)} chars (max {MAX_TEXT_CHARS}).", ""
+        return f"⚠️ Слишком длинный текст: {len(text)} символов (максимум {MAX_TEXT_CHARS}).", ""
     if not os.environ.get("GROQ_API_KEY"):
-        return "⚠️ Server misconfigured: GROQ_API_KEY is not set.", ""
+        return "⚠️ Сервер не настроен: не задан GROQ_API_KEY.", ""
 
     tid = text_id.strip() or "adhoc"
-    progress(0.1, desc="Running 3 parallel passes...")
+    progress(0.1, desc="Запускаю три параллельных прогона…")
     report = asyncio.run(run_review(text, tid))
-    progress(1.0, desc="Done")
+    progress(1.0, desc="Готово")
     return _fmt_report(report), render_markdown(report)
 
 
@@ -115,25 +174,31 @@ SAMPLE = """Компания X запустила продукт в 2019 год�
 Мы уверены, что дальнейший рост неизбежен, потому что тренд очевиден."""
 
 
-with gr.Blocks(title="Triple-Pass Text Reviewer") as demo:
+with gr.Blocks(title="Проверка текста в 3 прогона") as demo:
     gr.Markdown(
-        "# 🔍 Triple-Pass Text Reviewer\n"
-        "Три независимых LLM-прогона (технический вычитчик · логик-придира · читатель без контекста), "
-        "консенсус по правилу 2-из-3, дословная привязка цитат к тексту."
+        "# 🔍 Проверка текста в 3 прогона\n"
+        "Три независимых прогона: **технический вычитчик** · **логик-придира** · "
+        "**читатель без контекста**.  \n"
+        "Каждый прогон обязан цитировать текст дословно — иначе дефект отбрасывается. "
+        "Дефект, найденный 2–3 прогонами, считается подтверждённым и получает высокий приоритет."
     )
     with gr.Row():
         with gr.Column(scale=2):
             text_in = gr.Textbox(
-                label="Text to review",
+                label="Текст на проверку",
                 lines=14,
-                placeholder="Вставьте текст...",
+                placeholder="Вставьте текст сюда…",
                 value=SAMPLE,
             )
-            text_id_in = gr.Textbox(label="Text ID (optional)", value="")
-            btn = gr.Button("Run 3-pass review", variant="primary")
+            text_id_in = gr.Textbox(
+                label="ID текста (необязательно)",
+                placeholder="например, статья-о-запуске",
+                value="",
+            )
+            btn = gr.Button("Проверить в 3 прогона", variant="primary", size="lg")
         with gr.Column(scale=3):
-            report_md = gr.Markdown(label="Report")
-            with gr.Accordion("Raw Markdown (copy for docs)", open=False):
+            report_md = gr.Markdown(label="Отчёт")
+            with gr.Accordion("Сырой Markdown (для копирования в документы)", open=False):
                 raw_md = gr.Textbox(label="", lines=20, show_copy_button=True)
     btn.click(review_text, [text_in, text_id_in], [report_md, raw_md])
 
