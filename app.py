@@ -22,6 +22,13 @@ from reviewer.orchestrator import review as run_review
 from reviewer.report import render_markdown
 from reviewer.schema import ReviewReport
 
+_key = os.environ.get("ANTHROPIC_API_KEY", "")
+print(
+    f"[boot] ANTHROPIC_API_KEY set: {'yes' if _key else 'NO'} "
+    f"(len={len(_key)}, starts_with={_key[:7] if _key else '-'})",
+    flush=True,
+)
+
 
 if HAS_SPACES:
     @spaces.GPU(duration=1)
