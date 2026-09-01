@@ -10,9 +10,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 import gradio as gr
 
+# HF ZeroGPU containers require at least one @spaces.GPU function at startup,
+# even if we never invoke GPU (we only call Anthropic over the network).
+try:
+    import spaces  # type: ignore
+    HAS_SPACES = True
+except ImportError:
+    HAS_SPACES = False
+
 from reviewer.orchestrator import review as run_review
 from reviewer.report import render_markdown
 from reviewer.schema import ReviewReport
+
+
+if HAS_SPACES:
+    @spaces.GPU(duration=1)
+    def _zerogpu_probe():
+        """Never called at runtime; exists only to satisfy ZeroGPU startup check."""
+        return "ok"
 
 
 MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "20000"))
@@ -117,4 +132,8 @@ with gr.Blocks(title="Triple-Pass Text Reviewer") as demo:
 
 
 if __name__ == "__main__":
-    demo.queue().launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
+    demo.queue().launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        ssr_mode=False,
+    )
