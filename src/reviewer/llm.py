@@ -1,55 +1,149 @@
-"""Thin async wrapper around Groq API (OpenAI-compatible) with retries."""
-import os
-import time
-from dataclasses import dataclass
+"""LLM client factory: picks a provider from env, walks a fallback chain."""
+from __future__ import annotations
 
-from groq import AsyncGroq, APIConnectionError, APITimeoutError, RateLimitError
+import logging
+import os
+
 from tenacity import (
-    retry, stop_after_attempt, wait_exponential, retry_if_exception_type,
+    AsyncRetrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
 )
 
+from .providers import ProviderError, get_provider
+from .providers.base import BaseProvider, LLMResponse
 
-@dataclass
-class LLMResponse:
-    text: str
-    tokens_in: int
-    tokens_out: int
-    latency_ms: int
+log = logging.getLogger(__name__)
+
+__all__ = ["LLMClient", "LLMResponse", "ProviderError", "parse_chain"]
+
+DEFAULT_PROVIDER = "groq"
+RETRY_ATTEMPTS = 3
+
+
+def parse_chain(raw: str | None) -> list[tuple[str, str | None]]:
+    """Parse LLM_FALLBACK_CHAIN into [(provider, model_or_None), ...].
+
+    Format: "groq:llama-3.3-70b-versatile,openrouter:meta-llama/llama-3.3-70b-instruct:free"
+    A bare provider name means "use that provider's default model".
+    Model ids may contain colons, so only the FIRST colon separates the two.
+    """
+    if not raw or not raw.strip():
+        return []
+    out: list[tuple[str, str | None]] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        provider, _, model = part.partition(":")
+        out.append((provider.strip().lower(), model.strip() or None))
+    return out
 
 
 class LLMClient:
-    def __init__(self, model_id: str | None = None, api_key: str | None = None):
-        self.model_id = model_id or os.environ.get("MODEL_ID", "llama-3.3-70b-versatile")
-        self.client = AsyncGroq(
-            api_key=api_key or os.environ.get("GROQ_API_KEY"),
-            timeout=120.0,
+    """Calls the first working provider in the chain.
+
+    The chain comes from LLM_FALLBACK_CHAIN when set, otherwise it is the single
+    entry (LLM_PROVIDER, MODEL_ID). A provider is skipped when it cannot even be
+    constructed (missing key / SDK); it is abandoned mid-run only after its own
+    retries are exhausted.
+    """
+
+    def __init__(
+        self,
+        model_id: str | None = None,
+        api_key: str | None = None,
+        chain: list[tuple[str, str | None]] | None = None,
+    ):
+        if chain is None:
+            chain = parse_chain(os.environ.get("LLM_FALLBACK_CHAIN"))
+        if not chain:
+            provider = os.environ.get("LLM_PROVIDER", DEFAULT_PROVIDER)
+            chain = [(provider.strip().lower(), model_id)]
+        self._chain = chain
+        self._explicit_model = model_id
+        self._api_key = api_key
+        self._active: BaseProvider | None = None
+        self._active_index = 0
+        #: Provider switches that happened during this client's lifetime.
+        self.switch_notes: list[str] = []
+
+        self._active, self._active_index = self._build_from(0)
+
+    # -- construction ------------------------------------------------------
+
+    def _build_from(self, start: int) -> tuple[BaseProvider, int]:
+        """Instantiate the first constructible provider at or after `start`."""
+        errors: list[str] = []
+        for i in range(start, len(self._chain)):
+            provider_name, chain_model = self._chain[i]
+            model = self._explicit_model or chain_model
+            try:
+                cls = get_provider(provider_name)
+                # Chain entries pin their own model; don't let MODEL_ID override it.
+                instance = cls(model_id=model, api_key=self._api_key)
+            except (ProviderError, ValueError) as e:
+                errors.append(f"{provider_name}: {e}")
+                log.warning("provider %s unavailable: %s", provider_name, e)
+                continue
+            return instance, i
+        raise ProviderError(
+            "No usable LLM provider. Tried: " + "; ".join(errors or ["(empty chain)"])
         )
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=2, max=8),
-        retry=retry_if_exception_type((
-            APIConnectionError, APITimeoutError, RateLimitError,
-        )),
-        reraise=True,
-    )
+    # -- introspection -----------------------------------------------------
+
+    @property
+    def provider_name(self) -> str:
+        return self._active.name if self._active else "none"
+
+    @property
+    def model_id(self) -> str:
+        return self._active.model_id if self._active else ""
+
+    def describe(self) -> str:
+        return self._active.describe() if self._active else "no provider"
+
+    # -- calling -----------------------------------------------------------
+
     async def call(self, system: str, user: str, max_tokens: int = 4096) -> LLMResponse:
-        t0 = time.perf_counter()
-        resp = await self.client.chat.completions.create(
-            model=self.model_id,
-            temperature=0,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
+        last_error: BaseException | None = None
+        index = self._active_index
+
+        while index < len(self._chain):
+            provider = self._active
+            assert provider is not None
+            try:
+                return await self._call_with_retries(provider, system, user, max_tokens)
+            except Exception as e:  # noqa: BLE001 — any failure means try the next one
+                last_error = e
+                log.warning("provider %s failed: %s", provider.name, e)
+                if index + 1 >= len(self._chain):
+                    break
+                try:
+                    self._active, index = self._build_from(index + 1)
+                except ProviderError:
+                    break
+                self._active_index = index
+                note = (
+                    f"{provider.name} не ответил ({type(e).__name__}), "
+                    f"переключился на {self._active.name} · {self._active.model_id}"
+                )
+                self.switch_notes.append(note)
+
+        raise last_error if last_error else ProviderError("no provider produced a reply")
+
+    async def _call_with_retries(
+        self, provider: BaseProvider, system: str, user: str, max_tokens: int
+    ) -> LLMResponse:
+        retryer = AsyncRetrying(
+            stop=stop_after_attempt(RETRY_ATTEMPTS),
+            wait=wait_exponential(multiplier=2, min=2, max=8),
+            retry=retry_if_exception_type(provider.retryable_exceptions()),
+            reraise=True,
         )
-        elapsed = int((time.perf_counter() - t0) * 1000)
-        text = (resp.choices[0].message.content or "").strip()
-        usage = resp.usage
-        return LLMResponse(
-            text=text,
-            tokens_in=getattr(usage, "prompt_tokens", 0) or 0,
-            tokens_out=getattr(usage, "completion_tokens", 0) or 0,
-            latency_ms=elapsed,
-        )
+        async for attempt in retryer:
+            with attempt:
+                return await provider.call(system, user, max_tokens=max_tokens)
+        raise ProviderError("retry loop exited without a result")  # unreachable

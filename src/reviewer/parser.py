@@ -1,9 +1,10 @@
 """Parse the JSON block emitted by each pass and validate findings."""
 import json
 import re
-from .schema import Finding, PassId
+
 from .passes import ALLOWED_CATEGORIES
 from .preprocess import normalize
+from .schema import Finding, PassId
 
 _JSON_BLOCK = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
 _JSON_BLOCK_LOOSE = re.compile(r"\{[^{}]*\"findings\"[^{}]*\}", re.DOTALL)

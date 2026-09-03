@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 PassId = Literal["p1", "p2", "p3"]
 Category = Literal["facts", "logic", "style", "reader"]
@@ -47,6 +47,7 @@ class ReviewReport(BaseModel):
     text_id: str
     created_at: datetime
     model_id: str
+    provider: str = ""
     pass_version: str
     passes: list[PassResult]
     consensus: list[ConsensusItem]

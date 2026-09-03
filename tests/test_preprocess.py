@@ -1,4 +1,4 @@
-from reviewer.preprocess import number_text, normalize, strip_markers
+from reviewer.preprocess import normalize, number_text, strip_markers
 
 
 def test_number_text_basic():

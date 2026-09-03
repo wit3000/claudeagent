@@ -1,6 +1,6 @@
 import pytest
-from reviewer.parser import parse_pass, extract_json, ParseError
 
+from reviewer.parser import ParseError, extract_json, parse_pass
 
 SOURCE = "Первое предложение. Второе.\n\nВторой абзац."
 
@@ -40,6 +40,23 @@ def test_parse_pass_out_of_range_dropped():
     raw = '```json\n{"findings":[{"quote":"Первое предложение.","paragraph":99,"sentence":1,"category":"facts","defect":"x","fix":"y"}]}\n```'
     findings, _ = parse_pass(raw, "p1", SOURCE, max_paragraph=2)
     assert findings == []
+
+
+def test_parse_pass_dash_normalized_quote_accepted():
+    # source uses em dash, model returns hyphen — should still match
+    source = "Рост — это хорошо.\n\nВторой абзац."
+    raw = '```json\n{"findings":[{"quote":"Рост - это хорошо.","paragraph":1,"sentence":1,"category":"style","defect":"x","fix":"y"}]}\n```'
+    findings, hall = parse_pass(raw, "p1", source, max_paragraph=2)
+    assert len(findings) == 1
+    assert hall == 0
+
+
+def test_parse_pass_yo_normalized_quote_accepted():
+    source = "Всё идёт по плану.\n\nВторой абзац."
+    raw = '```json\n{"findings":[{"quote":"Все идет по плану.","paragraph":1,"sentence":1,"category":"style","defect":"x","fix":"y"}]}\n```'
+    findings, hall = parse_pass(raw, "p1", source, max_paragraph=2)
+    assert len(findings) == 1
+    assert hall == 0
 
 
 def test_parse_pass_dedupes_within_pass():

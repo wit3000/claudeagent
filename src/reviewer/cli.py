@@ -1,6 +1,5 @@
 """CLI: python -m reviewer review path/to/text.txt --id my-id"""
 import asyncio
-import json
 import sys
 from datetime import datetime
 from pathlib import Path

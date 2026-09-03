@@ -3,19 +3,30 @@ import asyncio
 import random
 from datetime import datetime, timezone
 
-from .llm import LLMClient
-from .passes import PASSES, PASS_VERSION
-from .preprocess import number_text
-from .parser import parse_pass, ParseError
 from .consensus import build_consensus
-from .schema import PassResult, ReviewReport, PassId
-
+from .llm import LLMClient
+from .parser import ParseError, parse_pass
+from .passes import PASS_VERSION, PASSES
+from .preprocess import number_text
+from .schema import PassId, PassResult, ReviewReport
 
 HALLUCINATION_UNRELIABLE_RATIO = 0.30
+#: Below this validity ratio we retry the pass once with a stern reminder.
+LOW_VALIDITY_RATIO = 0.70
 RETRY_JSON_MESSAGE = (
     "Your previous reply did not contain a valid JSON block matching the schema. "
     "Return ONLY the JSON block now, nothing else."
 )
+RETRY_NUDGE_MESSAGE = (
+    "\n\nВ твоём предыдущем ответе были цитаты, которых нет в тексте дословно. "
+    "Возьми каждую цитату ровно как в оригинале (те же слова, знаки, регистр) "
+    "и включай замечание, только если цитата действительно есть в тексте."
+)
+
+
+def _validity(findings_count: int, hallucinated: int) -> float:
+    total = findings_count + hallucinated
+    return 1.0 if total == 0 else findings_count / total
 
 
 async def _run_pass(
@@ -65,6 +76,21 @@ async def _run_pass(
                 failure_reason=f"Could not parse JSON after retry: {e}",
             )
 
+    # Quality gate: if the model fabricated many quotes, retry once with a
+    # sharper reminder and keep whichever attempt was cleaner.
+    if _validity(len(findings), hallucinated) < LOW_VALIDITY_RATIO:
+        try:
+            resp3 = await client.call(system=system, user=user_msg + RETRY_NUDGE_MESSAGE)
+            f3, h3 = parse_pass(resp3.text, pass_id, source_text, max_paragraph)
+            tokens_in += resp3.tokens_in
+            tokens_out += resp3.tokens_out
+            latency += resp3.latency_ms
+            if _validity(len(f3), h3) > _validity(len(findings), hallucinated):
+                findings, hallucinated = f3, h3
+                raw = raw + "\n\n---nudge-retry---\n\n" + resp3.text
+        except Exception:  # noqa: BLE001 — retry is best-effort, keep first result
+            pass
+
     return PassResult(
         pass_id=pass_id,
         pass_version=PASS_VERSION,
@@ -101,12 +127,17 @@ async def review(
         total = len(pr.findings) + pr.hallucinated_count
         if total and pr.hallucinated_count / total > HALLUCINATION_UNRELIABLE_RATIO:
             warnings.append(
-                f"Pass {pr.pass_id} unreliable: {pr.hallucinated_count}/{total} findings hallucinated"
+                f"Pass {pr.pass_id} unreliable: "
+                f"{pr.hallucinated_count}/{total} findings hallucinated"
             )
         elif pr.hallucinated_count:
             warnings.append(
                 f"Pass {pr.pass_id}: {pr.hallucinated_count} findings excluded as hallucinated"
             )
+
+    # Surface any mid-run provider fallback as a Russian warning.
+    for note in getattr(client, "switch_notes", []):
+        warnings.append(note)
 
     consensus, clean = build_consensus(results)
 
@@ -114,6 +145,7 @@ async def review(
         text_id=text_id,
         created_at=datetime.now(timezone.utc),
         model_id=client.model_id,
+        provider=getattr(client, "provider_name", ""),
         pass_version=PASS_VERSION,
         passes=results,
         consensus=consensus,

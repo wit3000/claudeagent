@@ -5,7 +5,10 @@ from .schema import ReviewReport
 def render_markdown(report: ReviewReport) -> str:
     lines: list[str] = []
     lines.append(f"# Review report — {report.text_id}")
-    lines.append(f"Model: `{report.model_id}` · Pass version: `{report.pass_version}` · Generated: {report.created_at.isoformat()}")
+    lines.append(
+        f"Model: `{report.model_id}` · Pass version: `{report.pass_version}` "
+        f"· Generated: {report.created_at.isoformat()}"
+    )
     lines.append("")
 
     high = [c for c in report.consensus if c.priority == "high"]

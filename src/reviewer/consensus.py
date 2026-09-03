@@ -1,8 +1,8 @@
 """Merge findings from three passes into consensus items."""
 from collections import defaultdict
-from .schema import Finding, ConsensusItem, PassResult, Category
-from .preprocess import normalize
 
+from .preprocess import normalize
+from .schema import Category, ConsensusItem, Finding, PassResult
 
 CATEGORY_OWNERS: dict[Category, set[str]] = {
     "facts": {"p1"},

@@ -3,6 +3,8 @@ import asyncio
 import html
 import os
 import sys
+import time
+from collections import deque
 from pathlib import Path
 
 # Make the src/ layout importable without pip install (needed on HF Spaces).
@@ -19,14 +21,24 @@ except ImportError:
     HAS_SPACES = False
 
 from reviewer.orchestrator import review as run_review
+from reviewer.providers import get_provider
 from reviewer.schema import ReviewReport
 
-_key = os.environ.get("GROQ_API_KEY", "")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "groq").strip().lower()
+try:
+    _key_env = get_provider(LLM_PROVIDER).api_key_env
+except ValueError:
+    _key_env = "GROQ_API_KEY"
+_key = os.environ.get(_key_env, "")
 print(
-    f"[boot] GROQ_API_KEY set: {'yes' if _key else 'NO'} "
-    f"(len={len(_key)}, starts_with={_key[:5] if _key else '-'})",
+    f"[boot] provider={LLM_PROVIDER} · {_key_env} set: {'yes' if _key else 'NO'} "
+    f"(len={len(_key)})",
     flush=True,
 )
+
+
+def _key_present() -> bool:
+    return bool(os.environ.get(_key_env))
 
 
 if HAS_SPACES:
@@ -37,6 +49,20 @@ if HAS_SPACES:
 
 
 MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "20000"))
+PROCESS_MAX_PER_HOUR = int(os.environ.get("PROCESS_MAX_PER_HOUR", "30"))
+
+# Process-wide sliding-window rate limit (protects the API key from runaway loops).
+_call_times: deque[float] = deque()
+
+
+def _rate_limited() -> bool:
+    now = time.time()
+    while _call_times and now - _call_times[0] > 3600:
+        _call_times.popleft()
+    if len(_call_times) >= PROCESS_MAX_PER_HOUR:
+        return True
+    _call_times.append(now)
+    return False
 
 
 CATEGORY_LABELS = {
@@ -174,6 +200,15 @@ def _fmt_report(report: ReviewReport) -> str:
     if total == 0:
         out.append("_Дефектов не обнаружено. Текст можно публиковать._")
 
+    # Footer: what produced this report (helps reproduce results).
+    provider = getattr(report, "provider", "") or "—"
+    out.append("")
+    out.append("---")
+    out.append(
+        f"<sub>Провайдер: {provider} · Модель: {report.model_id} · "
+        f"Версия промта: {report.pass_version}</sub>"
+    )
+
     return "\n".join(out)
 
 
@@ -181,13 +216,27 @@ def review_text(text: str, text_id: str, progress=gr.Progress()):
     if not text or not text.strip():
         return "⚠️ Пустой текст."
     if len(text) > MAX_TEXT_CHARS:
-        return f"⚠️ Слишком длинный текст: {len(text)} символов (максимум {MAX_TEXT_CHARS})."
-    if not os.environ.get("GROQ_API_KEY"):
-        return "⚠️ Сервер не настроен: не задан GROQ_API_KEY."
+        return (
+            f"⚠️ Текст слишком длинный: {len(text)} символов при лимите {MAX_TEXT_CHARS}. "
+            f"Разбейте его на части и проверьте по отдельности."
+        )
+    if not _key_present():
+        return (
+            f"⚠️ Сервер не настроен: не задан {_key_env} "
+            f"(провайдер {LLM_PROVIDER})."
+        )
+    if _rate_limited():
+        return (
+            f"⚠️ Достигнут лимит {PROCESS_MAX_PER_HOUR} проверок в час. "
+            f"Подождите немного и повторите."
+        )
 
     tid = text_id.strip() or "adhoc"
     progress(0.1, desc="Запускаю три параллельных прогона…")
-    report = asyncio.run(run_review(text, tid))
+    try:
+        report = asyncio.run(run_review(text, tid))
+    except Exception as e:  # noqa: BLE001 — show the operator the real reason
+        return f"⚠️ Ошибка при проверке: {type(e).__name__}: {e}"
     progress(1.0, desc="Готово")
     return _fmt_report(report)
 

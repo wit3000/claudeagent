@@ -1,5 +1,10 @@
 gradio>=5.9
 spaces>=0.30
-groq>=0.11
 pydantic>=2.6
 tenacity>=8.2
+
+# LLM providers — all light, installed together so LLM_PROVIDER can switch
+# without a rebuild. Only the selected one is imported at runtime.
+openai>=1.40
+anthropic>=0.40
+google-genai>=0.3

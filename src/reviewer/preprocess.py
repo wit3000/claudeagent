@@ -36,8 +36,23 @@ _QUOTE_MAP = str.maketrans({
 })
 
 
+_EXTRA_MAP = str.maketrans({
+    # dashes → hyphen (models love to swap — for -)
+    "—": "-", "–": "-", "‒": "-", "―": "-", "−": "-",
+    # ё → е so a quote that drops the diaeresis still matches
+    "ё": "е", "Ё": "е",
+})
+
+
 def normalize(s: str) -> str:
-    return _NORMALIZE_WS.sub(" ", s.translate(_QUOTE_MAP)).strip().lower()
+    """Loosely normalize so a quote still matches after cosmetic model edits.
+
+    Handles: case, whitespace runs, curly/guillemet quotes, dash variants,
+    non-breaking spaces, and ё→е. Widens what counts as a verbatim quote just
+    enough to survive weak models without accepting genuine fabrications.
+    """
+    s = s.translate(_QUOTE_MAP).translate(_EXTRA_MAP)
+    return _NORMALIZE_WS.sub(" ", s).strip().lower()
 
 
 def strip_markers(numbered: str) -> str:
