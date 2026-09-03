@@ -23,39 +23,52 @@ pinned: false
 
 1. Задеплой сервис (см. ниже).
 2. Отправь пользователю корневую ссылку — они увидят форму.
-3. После проверки каждый отчёт получает постоянный URL вида `https://ваш-домен/r/<job_id>` и кнопку **Copy share link** — этой ссылкой можно делиться, отчёт лежит в SQLite и переживает рестарт.
+3. После каждой проверки в интерфейсе появляется прямая ссылка вида
+   `https://ваш-домен/?job=<id>` — по ней открывается именно этот отчёт.
+   Отчёты хранятся в SQLite (на бесплатном HF диск эфемерный — история
+   сбрасывается при перезапуске Space; сами проверки работают всегда).
+
+## Выбор LLM-провайдера
+
+Провайдер выбирается переменной `LLM_PROVIDER` без правки кода:
+`groq` (по умолчанию, бесплатный, без карты) · `openai` · `anthropic` ·
+`gemini` · `openrouter`. Ключ читается из переменной провайдера
+(`GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+`OPENROUTER_API_KEY`). Модель — через `MODEL_ID` (у каждого провайдера свой
+дефолт).
+
+Опциональный автопереход при сбое — `LLM_FALLBACK_CHAIN` (список
+`провайдер:модель` через запятую). Если первый упал, берётся следующий, и в
+отчёте появляется пометка. Полный список переменных — в `.env.example`.
 
 ## Деплой на Hugging Face Spaces (Gradio SDK, бесплатно, без карты)
 
+**Создать Space один раз:**
+
 1. На [huggingface.co](https://huggingface.co) → **New Space**.
-   - Space name: например `triple-pass-reviewer`.
-   - License: `mit` подойдёт.
-   - **SDK: Gradio** → **Blank**.
-   - Hardware: `CPU basic` (бесплатный). Если он недоступен — подойдёт и `ZeroGPU` (тоже бесплатный): наш сервис не использует GPU, только вызывает Anthropic API, так что GPU-квота не тратится.
-   - Visibility: **Private** — важно, иначе твой API-ключ будут жечь другие.
-2. Space создан → **Settings** → **Variables and secrets** → **New secret**:
-   - Name: `ANTHROPIC_API_KEY` · Value: твой ключ.
-3. Залей файлы. Проще всего через git:
-   ```bash
-   git clone https://huggingface.co/spaces/<твой-hf-user>/triple-pass-reviewer hf-space
-   cd hf-space
-   # скопировать нужные файлы из этого репо:
-   cp /path/to/claudeagent/{app.py,requirements.txt,README.md} .
-   cp -r /path/to/claudeagent/src .
-   git add -A && git commit -m "init" && git push
-   ```
-   Или через UI: **Files** → **Add file** → перетащить `app.py`, `requirements.txt`, `README.md` и папку `src/`.
-4. HF автоматически поставит зависимости и запустит Gradio (~1–2 минуты, статус в **Logs**).
-   Готовый URL: `https://<твой-hf-user>-triple-pass-reviewer.hf.space`.
+   - **SDK: Gradio** → **Blank**. Hardware: `CPU basic` (или `ZeroGPU` —
+     GPU не используется). Visibility: **Private**.
+2. **Settings → Variables and secrets → New secret**: `GROQ_API_KEY` =
+   твой ключ ([console.groq.com/keys](https://console.groq.com/keys),
+   без карты). При другом провайдере — соответствующая переменная.
 
-**Приватный Space:** ссылка работает только пока ты залогинен на HF. Для «только я» — то, что нужно.
+**Заливка кода — одной командой** (больше не нужно копипастить файлы):
 
-**Про засыпание:** после ~48ч бездействия Space засыпает, при заходе просыпается за ~30 секунд. Ключ не тратится.
+```bash
+pip install huggingface_hub
+export HF_TOKEN=hf_...   # write-токен из huggingface.co/settings/tokens
+python scripts/deploy_hf.py --space <твой-hf-user>/triple-pass-reviewer
+```
+
+Скрипт заливает `app.py`, `requirements.txt`, `README.md` и `src/`,
+игнорируя тесты, кэши и локальные данные. После пуша HF сам пересоберёт
+Space (~1–2 минуты, статус в **Logs**). Повторный деплой — та же команда.
 
 ## Деплой на любой VPS
 
-Есть `Dockerfile` — работает где угодно. Обязательные env:
-`ANTHROPIC_API_KEY`, `MODEL_ID` (по умолчанию `claude-sonnet-5`), `PUBLIC_MODE=1` **или** `APP_PASSWORD`. Опциональные: `RATE_LIMIT_PER_HOUR`, `MAX_TEXT_CHARS`, `DB_PATH` (должен быть на персистентном диске).
+Есть `Dockerfile`. Обязательные env: `LLM_PROVIDER` + ключ провайдера.
+Опциональные: `MODEL_ID`, `LLM_FALLBACK_CHAIN`, `MAX_TEXT_CHARS`,
+`PROCESS_MAX_PER_HOUR`, `DB_PATH` (на персистентном диске).
 
 ## Локальный запуск
 

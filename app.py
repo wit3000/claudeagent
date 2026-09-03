@@ -20,6 +20,7 @@ try:
 except ImportError:
     HAS_SPACES = False
 
+from reviewer import history
 from reviewer.orchestrator import review as run_review
 from reviewer.providers import get_provider
 from reviewer.schema import ReviewReport
@@ -212,33 +213,74 @@ def _fmt_report(report: ReviewReport) -> str:
     return "\n".join(out)
 
 
-def review_text(text: str, text_id: str, progress=gr.Progress()):
+def _base_url(request: gr.Request | None) -> str:
+    if request is None:
+        return ""
+    try:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        proto = request.headers.get("x-forwarded-proto", "https")
+        if host:
+            return f"{proto}://{host}"
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def review_text(text: str, text_id: str, request: gr.Request = None,
+                progress=gr.Progress()):
+    empty_share = ""
     if not text or not text.strip():
-        return "⚠️ Пустой текст."
+        return "⚠️ Пустой текст.", empty_share
     if len(text) > MAX_TEXT_CHARS:
         return (
             f"⚠️ Текст слишком длинный: {len(text)} символов при лимите {MAX_TEXT_CHARS}. "
             f"Разбейте его на части и проверьте по отдельности."
-        )
+        ), empty_share
     if not _key_present():
         return (
             f"⚠️ Сервер не настроен: не задан {_key_env} "
             f"(провайдер {LLM_PROVIDER})."
-        )
+        ), empty_share
     if _rate_limited():
         return (
             f"⚠️ Достигнут лимит {PROCESS_MAX_PER_HOUR} проверок в час. "
             f"Подождите немного и повторите."
-        )
+        ), empty_share
 
     tid = text_id.strip() or "adhoc"
     progress(0.1, desc="Запускаю три параллельных прогона…")
     try:
         report = asyncio.run(run_review(text, tid))
     except Exception as e:  # noqa: BLE001 — show the operator the real reason
-        return f"⚠️ Ошибка при проверке: {type(e).__name__}: {e}"
+        return f"⚠️ Ошибка при проверке: {type(e).__name__}: {e}", empty_share
     progress(1.0, desc="Готово")
-    return _fmt_report(report)
+
+    md = _fmt_report(report)
+    high = sum(1 for c in report.consensus if c.priority == "high")
+    low = sum(1 for c in report.consensus if c.priority == "low")
+    job_id = history.save(tid, high, low, md)
+
+    base = _base_url(request)
+    share = f"🔗 Прямая ссылка на этот отчёт: {base}/?job={job_id}" if base else ""
+    return md, share
+
+
+def _load_history() -> list[list]:
+    rows = history.recent(30)
+    return [[r[0], r[1], r[2].replace("T", " "), r[3], r[4]] for r in rows]
+
+
+def _open_from_url(request: gr.Request):
+    """On page load, if ?job=<id> is present, show that stored report."""
+    try:
+        job_id = dict(request.query_params).get("job", "") if request else ""
+    except Exception:  # noqa: BLE001
+        job_id = ""
+    if job_id:
+        md = history.get(job_id)
+        if md:
+            return md
+    return gr.update()
 
 
 SAMPLE = """Компания X запустила продукт в 2019 году. За первый год они привлекли 50 000 пользователей.
@@ -256,23 +298,55 @@ with gr.Blocks(title="Проверка текста в 3 прогона") as dem
         "Каждый прогон обязан цитировать текст дословно — иначе дефект отбрасывается. "
         "Дефект, найденный 2–3 прогонами, считается подтверждённым и получает высокий приоритет."
     )
-    with gr.Row():
-        with gr.Column(scale=2):
-            text_in = gr.Textbox(
-                label="Текст на проверку",
-                lines=14,
-                placeholder="Вставьте текст сюда…",
-                value=SAMPLE,
+    with gr.Tabs():
+        with gr.Tab("Проверка"):
+            with gr.Row():
+                with gr.Column(scale=2):
+                    text_in = gr.Textbox(
+                        label="Текст на проверку",
+                        lines=14,
+                        placeholder="Вставьте текст сюда…",
+                        value=SAMPLE,
+                    )
+                    text_id_in = gr.Textbox(
+                        label="ID текста (необязательно)",
+                        placeholder="например, статья-о-запуске",
+                        value="",
+                    )
+                    btn = gr.Button("Проверить в 3 прогона", variant="primary",
+                                    size="lg")
+                with gr.Column(scale=3):
+                    share_line = gr.Markdown("")
+                    report_md = gr.Markdown(label="Отчёт")
+
+        with gr.Tab("История") as history_tab:
+            gr.Markdown(
+                "Последние проверки на этом сервере. На бесплатном хостинге "
+                "история сбрасывается при перезапуске сервиса."
             )
-            text_id_in = gr.Textbox(
-                label="ID текста (необязательно)",
-                placeholder="например, статья-о-запуске",
-                value="",
+            refresh_btn = gr.Button("Обновить список")
+            history_df = gr.Dataframe(
+                headers=["job_id", "ID текста", "Когда", "🔴", "🟡"],
+                datatype=["str", "str", "str", "number", "number"],
+                interactive=False,
+                wrap=True,
             )
-            btn = gr.Button("Проверить в 3 прогона", variant="primary", size="lg")
-        with gr.Column(scale=3):
-            report_md = gr.Markdown(label="Отчёт")
-    btn.click(review_text, [text_in, text_id_in], [report_md])
+            open_id = gr.Textbox(
+                label="Открыть отчёт по job_id (скопируйте из таблицы)",
+                placeholder="например, a1b2c3d4e5f6",
+            )
+            open_btn = gr.Button("Открыть отчёт")
+            history_report = gr.Markdown("")
+
+    btn.click(review_text, [text_in, text_id_in], [report_md, share_line])
+
+    refresh_btn.click(_load_history, None, history_df)
+    history_tab.select(_load_history, None, history_df)
+    open_btn.click(lambda jid: history.get(jid.strip()) or "_Отчёт не найден._",
+                   open_id, history_report)
+
+    # On first load, honour ?job=<id> to deep-link a specific report.
+    demo.load(_open_from_url, None, report_md)
 
 
 if __name__ == "__main__":
