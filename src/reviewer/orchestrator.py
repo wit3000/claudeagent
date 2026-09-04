@@ -1,6 +1,5 @@
 """Run three independent passes in parallel and merge results."""
 import asyncio
-import logging
 import os
 import random
 from collections.abc import Callable
@@ -13,43 +12,11 @@ from .passes import PASS_VERSION, PASSES
 from .preprocess import number_text
 from .schema import PassId, PassResult, ReviewReport
 
-log = logging.getLogger(__name__)
-
 #: Output token budget per LLM call. High enough that a full report + JSON block
 #: fits without truncation on ~20k-char inputs; override via env if needed.
+#: A model that caps output below this rejects the request and LLMClient retries
+#: once at its safe fallback budget, on the same provider.
 MAX_OUTPUT_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "8000"))
-
-#: Conservative per-call output budget every current model accepts; used as a
-#: one-shot fallback when a model rejects MAX_OUTPUT_TOKENS as too large.
-SAFE_FALLBACK_TOKENS = 4096
-
-
-def _is_max_tokens_error(exc: Exception) -> bool:
-    """True when the provider rejected the request for an oversized max_tokens."""
-    msg = str(exc).lower()
-    return "max_tokens" in msg and any(
-        kw in msg for kw in ("limit", "maximum", "exceed")
-    )
-
-
-async def _call_budgeted(client: LLMClient, system: str, user: str, max_tokens: int):
-    """Call the model, retrying once at SAFE_FALLBACK_TOKENS if it rejects the budget.
-
-    Some models cap output well below MAX_OUTPUT_TOKENS (e.g. Anthropic Haiku at
-    4096). Rather than let all three passes fail, drop to the safe budget once.
-    """
-    try:
-        return await client.call(system=system, user=user, max_tokens=max_tokens)
-    except Exception as e:  # noqa: BLE001 — narrow the decision to the message
-        if max_tokens > SAFE_FALLBACK_TOKENS and _is_max_tokens_error(e):
-            log.warning(
-                "model rejected max_tokens=%s (%s); retrying at %s",
-                max_tokens, e, SAFE_FALLBACK_TOKENS,
-            )
-            return await client.call(
-                system=system, user=user, max_tokens=SAFE_FALLBACK_TOKENS
-            )
-        raise
 
 #: Note appended when a pass answer was cut off at the output token limit.
 TRUNCATION_NOTE = (
@@ -85,7 +52,7 @@ async def _run_pass(
 ) -> PassResult:
     system = PASSES[pass_id]
     try:
-        resp = await _call_budgeted(client, system, user_msg, MAX_OUTPUT_TOKENS)
+        resp = await client.call(system=system, user=user_msg, max_tokens=MAX_OUTPUT_TOKENS)
     except Exception as e:
         return PassResult(
             pass_id=pass_id,
@@ -102,8 +69,10 @@ async def _run_pass(
         findings, hallucinated = parse_pass(raw, pass_id, source_text, max_paragraph)
     except ParseError:
         try:
-            resp2 = await _call_budgeted(
-                client, system, user_msg + "\n\n" + RETRY_JSON_MESSAGE, MAX_OUTPUT_TOKENS
+            resp2 = await client.call(
+                system=system,
+                user=user_msg + "\n\n" + RETRY_JSON_MESSAGE,
+                max_tokens=MAX_OUTPUT_TOKENS,
             )
             raw2 = resp2.text
             tokens_in += resp2.tokens_in
@@ -132,8 +101,10 @@ async def _run_pass(
     # sharper reminder and keep whichever attempt was cleaner.
     if _validity(len(findings), hallucinated) < LOW_VALIDITY_RATIO:
         try:
-            resp3 = await _call_budgeted(
-                client, system, user_msg + RETRY_NUDGE_MESSAGE, MAX_OUTPUT_TOKENS
+            resp3 = await client.call(
+                system=system,
+                user=user_msg + RETRY_NUDGE_MESSAGE,
+                max_tokens=MAX_OUTPUT_TOKENS,
             )
             f3, h3 = parse_pass(resp3.text, pass_id, source_text, max_paragraph)
             tokens_in += resp3.tokens_in

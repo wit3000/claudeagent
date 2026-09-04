@@ -19,6 +19,33 @@ def _text_from_candidates(candidates) -> str:
     return "".join(out)
 
 
+def _response_from_raw(resp, elapsed_ms: int) -> LLMResponse:
+    """Build an LLMResponse from a genai result, tolerating a MAX_TOKENS cut-off.
+
+    On a length cut-off ``resp.text`` can raise (no assembled parts); we salvage
+    whatever partial text the parts hold. ``truncated`` reflects ONLY a genuine
+    length stop, so other finish reasons (SAFETY, RECITATION, …) never show a
+    misleading "output was cut off" warning to the user.
+    """
+    usage = getattr(resp, "usage_metadata", None)
+    candidates = getattr(resp, "candidates", None) or []
+    truncated = False
+    if candidates:
+        finish_reason = getattr(candidates[0], "finish_reason", None)
+        truncated = str(getattr(finish_reason, "name", finish_reason)) == "MAX_TOKENS"
+    try:
+        text = (resp.text or "").strip()
+    except Exception:  # noqa: BLE001 — salvage partial output instead of failing
+        text = _text_from_candidates(candidates).strip()
+    return LLMResponse(
+        text=text,
+        tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
+        tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
+        latency_ms=elapsed_ms,
+        truncated=truncated,
+    )
+
+
 class Provider(BaseProvider):
     name = "gemini"
     api_key_env = "GOOGLE_API_KEY"
@@ -53,26 +80,7 @@ class Provider(BaseProvider):
             ),
         )
         elapsed = int((time.perf_counter() - t0) * 1000)
-        usage = getattr(resp, "usage_metadata", None)
-        candidates = getattr(resp, "candidates", None) or []
-        truncated = False
-        if candidates:
-            finish_reason = getattr(candidates[0], "finish_reason", None)
-            truncated = str(getattr(finish_reason, "name", finish_reason)) == "MAX_TOKENS"
-        # On a MAX_TOKENS cut-off google-genai's resp.text can raise (no assembled
-        # parts); fall back to whatever partial text the parts hold and flag it.
-        try:
-            text = (resp.text or "").strip()
-        except Exception:  # noqa: BLE001 — salvage partial output instead of failing
-            text = _text_from_candidates(candidates).strip()
-            truncated = True
-        return LLMResponse(
-            text=text,
-            tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
-            tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
-            latency_ms=elapsed,
-            truncated=truncated,
-        )
+        return _response_from_raw(resp, elapsed)
 
     @staticmethod
     def retryable_exceptions() -> tuple[type[BaseException], ...]:

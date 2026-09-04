@@ -225,13 +225,36 @@ def _fmt_report(report: ReviewReport) -> str:
     return "\n".join(out)
 
 
+def _strip_contract_json(text: str) -> str:
+    """Remove a bare, un-fenced contract JSON object (one containing "findings").
+
+    Scans for a brace-balanced object and drops it only when it holds "findings",
+    so ordinary prose that happens to contain braces is left untouched.
+    """
+    idx = text.find("{")
+    while idx != -1:
+        depth = 0
+        for j in range(idx, len(text)):
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    if '"findings"' in text[idx:j + 1]:
+                        return text[:idx] + text[j + 1:]
+                    break
+        idx = text.find("{", idx + 1)
+    return text
+
+
 def _prose_only(raw: str) -> str:
     """Strip the machine JSON block and retry markers, leaving readable prose."""
     import re as _re
     if not raw:
         return ""
-    # Drop the fenced ```json ... ``` contract block(s).
+    # Drop the fenced ```json ... ``` contract block(s), then any bare leftover.
     text = _re.sub(r"```json.*?```", "", raw, flags=_re.DOTALL | _re.IGNORECASE)
+    text = _strip_contract_json(text)
     # Drop the internal retry/nudge separator lines.
     lines = [
         ln for ln in text.splitlines()

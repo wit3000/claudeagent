@@ -21,6 +21,23 @@ __all__ = ["LLMClient", "LLMResponse", "ProviderError", "parse_chain"]
 DEFAULT_PROVIDER = "groq"
 RETRY_ATTEMPTS = 3
 
+#: Conservative per-call output budget every current model accepts; used as a
+#: one-shot fallback when a model rejects the requested max_tokens as too large.
+SAFE_FALLBACK_TOKENS = 4096
+
+_MAX_TOKENS_KEYS = ("max_tokens", "max_completion_tokens")
+_OVERAGE_KEYS = (
+    "limit", "maximum", "exceed", "too large", "at most", "too many",
+)
+
+
+def _is_max_tokens_error(exc: BaseException) -> bool:
+    """True when the provider rejected the request for an oversized token budget."""
+    msg = str(exc).lower()
+    return any(k in msg for k in _MAX_TOKENS_KEYS) and any(
+        k in msg for k in _OVERAGE_KEYS
+    )
+
 
 def parse_chain(raw: str | None) -> list[tuple[str, str | None]]:
     """Parse LLM_FALLBACK_CHAIN into [(provider, model_or_None), ...].
@@ -135,6 +152,25 @@ class LLMClient:
         raise last_error if last_error else ProviderError("no provider produced a reply")
 
     async def _call_with_retries(
+        self, provider: BaseProvider, system: str, user: str, max_tokens: int
+    ) -> LLMResponse:
+        # A max_tokens rejection is handled here, on the SAME provider, before the
+        # caller decides "provider failed, switch" — dropping to a safe budget once
+        # instead of triggering a bogus provider fallback.
+        try:
+            return await self._attempt(provider, system, user, max_tokens)
+        except Exception as e:  # noqa: BLE001 — narrow the decision to the message
+            if max_tokens > SAFE_FALLBACK_TOKENS and _is_max_tokens_error(e):
+                log.warning(
+                    "provider %s rejected max_tokens=%s (%s); retrying at %s",
+                    provider.name, max_tokens, e, SAFE_FALLBACK_TOKENS,
+                )
+                return await self._attempt(
+                    provider, system, user, SAFE_FALLBACK_TOKENS
+                )
+            raise
+
+    async def _attempt(
         self, provider: BaseProvider, system: str, user: str, max_tokens: int
     ) -> LLMResponse:
         retryer = AsyncRetrying(

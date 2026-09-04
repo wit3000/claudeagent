@@ -46,27 +46,6 @@ class FailingClient:
         raise RuntimeError("boom")
 
 
-class BudgetCappedClient:
-    """Rejects a large max_tokens, but answers at the safe fallback budget."""
-    def __init__(self, response, cap=4096):
-        self._response = response
-        self._cap = cap
-        self.calls = 0
-        self.max_tokens_seen: list[int] = []
-        self.model_id = "capped"
-        self.provider_name = "capped"
-        self.switch_notes = []
-
-    async def call(self, system, user, max_tokens=4096):
-        self.calls += 1
-        self.max_tokens_seen.append(max_tokens)
-        if max_tokens > self._cap:
-            raise RuntimeError(
-                f"max_tokens: must be less than or equal to model limit {self._cap}"
-            )
-        return LLMResponse(text=self._response, tokens_in=1, tokens_out=1, latency_ms=1)
-
-
 @pytest.mark.asyncio
 async def test_nudge_retry_fires_on_low_validity():
     # First reply: 1 valid + 2 fabricated quotes -> validity 0.33 (< 0.70).
@@ -138,20 +117,6 @@ async def test_truncated_pass_yields_warning():
     client = ScriptedClient([empty], truncated=True)
     report = await review(SOURCE, "tid", client=client)
     assert any("truncated" in w for w in report.warnings)
-
-
-@pytest.mark.asyncio
-async def test_run_pass_falls_back_on_max_tokens_error():
-    good = _json(
-        '[{"quote":"Первое предложение.","paragraph":1,"sentence":1,'
-        '"category":"facts","defect":"d","fix":"f"}]'
-    )
-    client = BudgetCappedClient(good, cap=4096)
-    result = await _run_pass(client, "p1", f"Text:\n{SOURCE}", SOURCE, max_paragraph=2)
-    assert not result.failed
-    assert len(result.findings) == 1
-    # First tried the big budget, then retried once at the safe fallback.
-    assert client.max_tokens_seen == [MAX_OUTPUT_TOKENS, 4096]
 
 
 @pytest.mark.asyncio
