@@ -30,6 +30,7 @@ class PassResult(BaseModel):
     failed: bool = False
     failure_reason: str | None = None
     hallucinated_count: int = 0
+    truncated: bool = False
 
 
 class ConsensusItem(BaseModel):

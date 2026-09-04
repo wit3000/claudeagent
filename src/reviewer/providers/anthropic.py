@@ -40,6 +40,7 @@ class Provider(BaseProvider):
             tokens_in=msg.usage.input_tokens,
             tokens_out=msg.usage.output_tokens,
             latency_ms=elapsed,
+            truncated=getattr(msg, "stop_reason", None) == "max_tokens",
         )
 
     @staticmethod

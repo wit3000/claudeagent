@@ -12,6 +12,8 @@ class LLMResponse:
     tokens_in: int
     tokens_out: int
     latency_ms: int
+    #: True when the provider stopped because it hit the output token limit.
+    truncated: bool = False
 
 
 class ProviderError(RuntimeError):

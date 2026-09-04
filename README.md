@@ -68,7 +68,9 @@ Space (~1–2 минуты, статус в **Logs**). Повторный деп
 
 Есть `Dockerfile`. Обязательные env: `LLM_PROVIDER` + ключ провайдера.
 Опциональные: `MODEL_ID`, `LLM_FALLBACK_CHAIN`, `MAX_TEXT_CHARS`,
-`PROCESS_MAX_PER_HOUR`, `DB_PATH` (на персистентном диске).
+`LLM_MAX_TOKENS` (бюджет вывода на один вызов, дефолт 8000; поднимите, если
+на длинных текстах отчёт обрезается), `PROCESS_MAX_PER_HOUR`, `DB_PATH`
+(на персистентном диске).
 
 ## Локальный запуск
 

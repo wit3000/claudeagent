@@ -100,6 +100,17 @@ def _translate_warning(w: str) -> str:
             f"{PASS_LABELS.get(pid, pid)}: {hall} замечание(-й) отброшено как галлюцинация "
             f"(цитата отсутствует в исходнике). На итог не влияет."
         )
+    m = _re.match(
+        r"Pass (p\d) truncated: output hit the token limit, some findings may be missing",
+        w,
+    )
+    if m:
+        pid = m.group(1)
+        return (
+            f"{PASS_LABELS.get(pid, pid)}: ответ модели обрезан по лимиту длины — "
+            f"часть замечаний могла потеряться. Уменьшите объём текста или "
+            f"поднимите `LLM_MAX_TOKENS`."
+        )
     m = _re.match(r"Pass (p\d) failed: (.+)", w)
     if m:
         pid, reason = m.group(1), m.group(2)
@@ -122,6 +133,11 @@ def _fmt_passes(report: ReviewReport) -> str:
     return "\n".join(rows)
 
 
+def _one_line(text: str) -> str:
+    """Collapse internal newlines so a multi-line value stays one Markdown item."""
+    return " ".join(text.split())
+
+
 def _fmt_finding(idx: int, it) -> str:
     loc = f"Абзац {it.paragraph}"
     if it.sentence is not None:
@@ -136,12 +152,12 @@ def _fmt_finding(idx: int, it) -> str:
         "**В чём проблема:**",
     ]
     for d in it.defects:
-        parts.append(f"- {html.escape(d)}")
+        parts.append(f"- {html.escape(_one_line(d))}")
     if it.fixes:
         parts.append("")
         parts.append("**Как исправить:**")
         for f in it.fixes:
-            parts.append(f"- {html.escape(f)}")
+            parts.append(f"- {html.escape(_one_line(f))}")
     return "\n".join(parts)
 
 
@@ -213,6 +229,18 @@ def _fmt_report(report: ReviewReport) -> str:
     return "\n".join(out)
 
 
+def _fmt_full_passes(report: ReviewReport) -> str:
+    """Human-readable prose each pass produced, for the collapsible accordion."""
+    out: list[str] = []
+    for p in report.passes:
+        out.append(f"## {PASS_LABELS.get(p.pass_id, p.pass_id)}")
+        out.append("")
+        raw = (p.raw_response or "").strip()
+        out.append(raw if raw else "_Прогон не дал ответа._")
+        out.append("")
+    return "\n".join(out)
+
+
 def _base_url(request: gr.Request | None) -> str:
     if request is None:
         return ""
@@ -229,40 +257,48 @@ def _base_url(request: gr.Request | None) -> str:
 def review_text(text: str, text_id: str, request: gr.Request = None,
                 progress=gr.Progress()):
     empty_share = ""
+    empty_full = ""
     if not text or not text.strip():
-        return "⚠️ Пустой текст.", empty_share
+        return "⚠️ Пустой текст.", empty_share, empty_full
     if len(text) > MAX_TEXT_CHARS:
         return (
             f"⚠️ Текст слишком длинный: {len(text)} символов при лимите {MAX_TEXT_CHARS}. "
             f"Разбейте его на части и проверьте по отдельности."
-        ), empty_share
+        ), empty_share, empty_full
     if not _key_present():
         return (
             f"⚠️ Сервер не настроен: не задан {_key_env} "
             f"(провайдер {LLM_PROVIDER})."
-        ), empty_share
+        ), empty_share, empty_full
     if _rate_limited():
         return (
             f"⚠️ Достигнут лимит {PROCESS_MAX_PER_HOUR} проверок в час. "
             f"Подождите немного и повторите."
-        ), empty_share
+        ), empty_share, empty_full
 
     tid = text_id.strip() or "adhoc"
-    progress(0.1, desc="Запускаю три параллельных прогона…")
+    progress(0.05, desc="Готовлю текст…")
+
+    def _on_progress(done: int, total: int, pass_id: str) -> None:
+        frac = 0.1 + 0.8 * done / total
+        label = PASS_LABELS.get(pass_id, pass_id)
+        progress(frac, desc=f"Готов: {label} ({done} из {total})")
+
     try:
-        report = asyncio.run(run_review(text, tid))
+        report = asyncio.run(run_review(text, tid, on_progress=_on_progress))
     except Exception as e:  # noqa: BLE001 — show the operator the real reason
-        return f"⚠️ Ошибка при проверке: {type(e).__name__}: {e}", empty_share
+        return f"⚠️ Ошибка при проверке: {type(e).__name__}: {e}", empty_share, empty_full
     progress(1.0, desc="Готово")
 
     md = _fmt_report(report)
+    full = _fmt_full_passes(report)
     high = sum(1 for c in report.consensus if c.priority == "high")
     low = sum(1 for c in report.consensus if c.priority == "low")
     job_id = history.save(tid, high, low, md)
 
     base = _base_url(request)
     share = f"🔗 Прямая ссылка на этот отчёт: {base}/?job={job_id}" if base else ""
-    return md, share
+    return md, share, full
 
 
 def _load_history() -> list[list]:
@@ -318,6 +354,8 @@ with gr.Blocks(title="Проверка текста в 3 прогона") as dem
                 with gr.Column(scale=3):
                     share_line = gr.Markdown("")
                     report_md = gr.Markdown(label="Отчёт")
+                    with gr.Accordion("Полные ответы прогонов", open=False):
+                        full_passes_md = gr.Markdown("")
 
         with gr.Tab("История") as history_tab:
             gr.Markdown(
@@ -338,7 +376,8 @@ with gr.Blocks(title="Проверка текста в 3 прогона") as dem
             open_btn = gr.Button("Открыть отчёт")
             history_report = gr.Markdown("")
 
-    btn.click(review_text, [text_in, text_id_in], [report_md, share_line])
+    btn.click(review_text, [text_in, text_id_in],
+              [report_md, share_line, full_passes_md])
 
     refresh_btn.click(_load_history, None, history_df)
     history_tab.select(_load_history, None, history_df)

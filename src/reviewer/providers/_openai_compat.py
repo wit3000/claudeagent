@@ -46,11 +46,13 @@ class OpenAICompatProvider(BaseProvider):
         elapsed = int((time.perf_counter() - t0) * 1000)
         text = (resp.choices[0].message.content or "").strip()
         usage = resp.usage
+        finish_reason = getattr(resp.choices[0], "finish_reason", None)
         return LLMResponse(
             text=text,
             tokens_in=getattr(usage, "prompt_tokens", 0) or 0,
             tokens_out=getattr(usage, "completion_tokens", 0) or 0,
             latency_ms=elapsed,
+            truncated=finish_reason == "length",
         )
 
     @staticmethod

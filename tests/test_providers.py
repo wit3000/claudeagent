@@ -1,7 +1,10 @@
+import types
+
 import pytest
 
 from reviewer.llm import LLMClient, parse_chain
 from reviewer.providers import PROVIDERS, ProviderError, get_provider
+from reviewer.providers._openai_compat import OpenAICompatProvider
 from reviewer.providers.base import LLMResponse
 
 
@@ -92,3 +95,41 @@ async def test_client_falls_back_on_failure(monkeypatch):
     assert client.provider_name == "working"
     assert client.switch_notes
     assert "переключился" in client.switch_notes[0]
+
+
+def _openai_provider_with_response(content: str, finish_reason: str):
+    """Build an OpenAICompatProvider whose SDK client returns a canned reply."""
+    resp = types.SimpleNamespace(
+        choices=[
+            types.SimpleNamespace(
+                message=types.SimpleNamespace(content=content),
+                finish_reason=finish_reason,
+            )
+        ],
+        usage=types.SimpleNamespace(prompt_tokens=5, completion_tokens=7),
+    )
+
+    class _Completions:
+        async def create(self, **kwargs):
+            return resp
+
+    provider = object.__new__(OpenAICompatProvider)
+    provider.model_id = "m"
+    provider.client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(completions=_Completions())
+    )
+    return provider
+
+
+@pytest.mark.asyncio
+async def test_openai_compat_marks_truncated_on_length():
+    provider = _openai_provider_with_response("partial", "length")
+    resp = await provider.call("s", "u")
+    assert resp.truncated is True
+
+
+@pytest.mark.asyncio
+async def test_openai_compat_not_truncated_on_stop():
+    provider = _openai_provider_with_response("done", "stop")
+    resp = await provider.call("s", "u")
+    assert resp.truncated is False

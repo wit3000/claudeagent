@@ -42,11 +42,17 @@ class Provider(BaseProvider):
         )
         elapsed = int((time.perf_counter() - t0) * 1000)
         usage = getattr(resp, "usage_metadata", None)
+        truncated = False
+        candidates = getattr(resp, "candidates", None) or []
+        if candidates:
+            finish_reason = getattr(candidates[0], "finish_reason", None)
+            truncated = str(getattr(finish_reason, "name", finish_reason)) == "MAX_TOKENS"
         return LLMResponse(
             text=(resp.text or "").strip(),
             tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
             tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
             latency_ms=elapsed,
+            truncated=truncated,
         )
 
     @staticmethod
