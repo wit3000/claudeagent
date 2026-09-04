@@ -133,3 +133,15 @@ async def test_openai_compat_not_truncated_on_stop():
     provider = _openai_provider_with_response("done", "stop")
     resp = await provider.call("s", "u")
     assert resp.truncated is False
+
+
+def test_gemini_salvages_text_when_resp_text_raises():
+    from reviewer.providers.gemini import _text_from_candidates
+
+    part = types.SimpleNamespace(text="частичный вывод")
+    content = types.SimpleNamespace(parts=[part])
+    cand = types.SimpleNamespace(content=content)
+    assert _text_from_candidates([cand]) == "частичный вывод"
+    # No candidates / no parts must not raise.
+    assert _text_from_candidates([]) == ""
+    assert _text_from_candidates([types.SimpleNamespace(content=None)]) == ""

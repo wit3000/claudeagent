@@ -7,6 +7,18 @@ import time
 from .base import BaseProvider, LLMResponse, ProviderError
 
 
+def _text_from_candidates(candidates) -> str:
+    """Concatenate any text parts present on the candidates (best-effort)."""
+    out: list[str] = []
+    for cand in candidates:
+        content = getattr(cand, "content", None)
+        for part in getattr(content, "parts", None) or []:
+            piece = getattr(part, "text", None)
+            if piece:
+                out.append(piece)
+    return "".join(out)
+
+
 class Provider(BaseProvider):
     name = "gemini"
     api_key_env = "GOOGLE_API_KEY"
@@ -42,13 +54,20 @@ class Provider(BaseProvider):
         )
         elapsed = int((time.perf_counter() - t0) * 1000)
         usage = getattr(resp, "usage_metadata", None)
-        truncated = False
         candidates = getattr(resp, "candidates", None) or []
+        truncated = False
         if candidates:
             finish_reason = getattr(candidates[0], "finish_reason", None)
             truncated = str(getattr(finish_reason, "name", finish_reason)) == "MAX_TOKENS"
+        # On a MAX_TOKENS cut-off google-genai's resp.text can raise (no assembled
+        # parts); fall back to whatever partial text the parts hold and flag it.
+        try:
+            text = (resp.text or "").strip()
+        except Exception:  # noqa: BLE001 — salvage partial output instead of failing
+            text = _text_from_candidates(candidates).strip()
+            truncated = True
         return LLMResponse(
-            text=(resp.text or "").strip(),
+            text=text,
             tokens_in=getattr(usage, "prompt_token_count", 0) or 0,
             tokens_out=getattr(usage, "candidates_token_count", 0) or 0,
             latency_ms=elapsed,

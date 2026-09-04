@@ -24,6 +24,7 @@ from reviewer import history
 from reviewer.orchestrator import review as run_review
 from reviewer.providers import get_provider
 from reviewer.schema import ReviewReport
+from reviewer.textutils import one_line
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "groq").strip().lower()
 try:
@@ -133,11 +134,6 @@ def _fmt_passes(report: ReviewReport) -> str:
     return "\n".join(rows)
 
 
-def _one_line(text: str) -> str:
-    """Collapse internal newlines so a multi-line value stays one Markdown item."""
-    return " ".join(text.split())
-
-
 def _fmt_finding(idx: int, it) -> str:
     loc = f"Абзац {it.paragraph}"
     if it.sentence is not None:
@@ -152,12 +148,12 @@ def _fmt_finding(idx: int, it) -> str:
         "**В чём проблема:**",
     ]
     for d in it.defects:
-        parts.append(f"- {html.escape(_one_line(d))}")
+        parts.append(f"- {html.escape(one_line(d))}")
     if it.fixes:
         parts.append("")
         parts.append("**Как исправить:**")
         for f in it.fixes:
-            parts.append(f"- {html.escape(_one_line(f))}")
+            parts.append(f"- {html.escape(one_line(f))}")
     return "\n".join(parts)
 
 
@@ -229,6 +225,21 @@ def _fmt_report(report: ReviewReport) -> str:
     return "\n".join(out)
 
 
+def _prose_only(raw: str) -> str:
+    """Strip the machine JSON block and retry markers, leaving readable prose."""
+    import re as _re
+    if not raw:
+        return ""
+    # Drop the fenced ```json ... ``` contract block(s).
+    text = _re.sub(r"```json.*?```", "", raw, flags=_re.DOTALL | _re.IGNORECASE)
+    # Drop the internal retry/nudge separator lines.
+    lines = [
+        ln for ln in text.splitlines()
+        if ln.strip() not in ("---retry---", "---nudge-retry---")
+    ]
+    return "\n".join(lines).strip()
+
+
 def _fmt_full_passes(report: ReviewReport) -> str:
     """Human-readable prose each pass produced, for the collapsible accordion."""
     out: list[str] = []
@@ -236,7 +247,12 @@ def _fmt_full_passes(report: ReviewReport) -> str:
         out.append(f"## {PASS_LABELS.get(p.pass_id, p.pass_id)}")
         out.append("")
         raw = (p.raw_response or "").strip()
-        out.append(raw if raw else "_Прогон не дал ответа._")
+        if not raw:
+            body = "_Прогон не дал ответа._"
+        else:
+            prose = _prose_only(raw)
+            body = prose if prose else "_Прогон не дал структурированного ответа._"
+        out.append(body)
         out.append("")
     return "\n".join(out)
 

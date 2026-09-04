@@ -1,10 +1,6 @@
 """Render ReviewReport as Markdown."""
 from .schema import ReviewReport
-
-
-def _one_line(text: str) -> str:
-    """Collapse internal newlines so a multi-line value stays one list item."""
-    return " ".join(text.split())
+from .textutils import one_line
 
 
 def render_markdown(report: ReviewReport) -> str:
@@ -56,12 +52,12 @@ def render_markdown(report: ReviewReport) -> str:
             lines.append("")
             lines.append("**Defects:**")
             for d in it.defects:
-                lines.append(f"- {_one_line(d)}")
+                lines.append(f"- {one_line(d)}")
             if it.fixes:
                 lines.append("")
                 lines.append("**Suggested fixes:**")
                 for f in it.fixes:
-                    lines.append(f"- {_one_line(f)}")
+                    lines.append(f"- {one_line(f)}")
             lines.append("")
 
     _render_group("High-priority findings", high)
