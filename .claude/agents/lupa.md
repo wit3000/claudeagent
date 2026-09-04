@@ -4,7 +4,7 @@ description: >
   Кодер. Принимает готовое ТЗ (из папки specs/ или напрямую от Пупы) и
   реализует его: пишет код и тесты, прогоняет линтеры и pytest, чинит
   падения. Не расширяет ТЗ по своей инициативе.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, Skill
 model: opus
 ---
 
