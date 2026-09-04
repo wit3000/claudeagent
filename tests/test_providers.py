@@ -183,6 +183,31 @@ def test_gemini_truncated_true_only_on_max_tokens():
     assert resp.truncated is False
 
 
+class _IntFinish:
+    """Fake genai result whose finish_reason is a bare int enum value."""
+    def __init__(self, finish_reason):
+        part = types.SimpleNamespace(text="ok")
+        content = types.SimpleNamespace(parts=[part])
+        self.candidates = [types.SimpleNamespace(
+            finish_reason=finish_reason, content=content,
+        )]
+        self.usage_metadata = types.SimpleNamespace(
+            prompt_token_count=1, candidates_token_count=1,
+        )
+        self.text = "ok"
+
+
+def test_gemini_truncated_true_on_int_finish_reason():
+    from reviewer.providers.gemini import _response_from_raw
+
+    # Some SDK versions return finish_reason as a bare int (MAX_TOKENS == 2).
+    resp = _response_from_raw(_IntFinish(2), elapsed_ms=1)
+    assert resp.truncated is True
+    # Any other numeric reason must not be flagged as a length cut-off.
+    resp = _response_from_raw(_IntFinish(1), elapsed_ms=1)
+    assert resp.truncated is False
+
+
 def test_is_max_tokens_error_recognises_common_phrasings():
     positives = [
         "max_tokens: must be less than or equal to model limit 4096",
@@ -198,6 +223,10 @@ def test_is_max_tokens_error_recognises_common_phrasings():
         "rate limit exceeded",  # no max_tokens key
         "invalid api key",
         "max_tokens must be a positive integer",  # no overage indicator
+        # Rate-limit / quota errors name max_tokens but are not budget rejections.
+        "rate limit exceeded: reduce your max_tokens",
+        "429: max_tokens exceeds tokens per minute quota",
+        "rpm limit reached; max_tokens too large",
     ]
     for msg in negatives:
         assert not _is_max_tokens_error(RuntimeError(msg)), msg

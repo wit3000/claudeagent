@@ -226,21 +226,42 @@ def _fmt_report(report: ReviewReport) -> str:
 
 
 def _strip_contract_json(text: str) -> str:
-    """Remove a bare, un-fenced contract JSON object (one containing "findings").
+    """Remove a bare, un-fenced contract JSON object (a dict holding "findings").
 
-    Scans for a brace-balanced object and drops it only when it holds "findings",
-    so ordinary prose that happens to contain braces is left untouched.
+    Scans for a brace-balanced object while ignoring braces that live inside JSON
+    strings (honouring ``"`` quotes and ``\\`` escapes), then confirms the span is
+    real JSON — a dict with a ``findings`` key — via ``json.loads`` before cutting
+    it. Ordinary prose that happens to contain braces is left untouched.
     """
+    import json as _json
     idx = text.find("{")
     while idx != -1:
         depth = 0
+        in_string = False
+        escaped = False
         for j in range(idx, len(text)):
-            if text[j] == "{":
+            ch = text[j]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
                 depth += 1
-            elif text[j] == "}":
+            elif ch == "}":
                 depth -= 1
                 if depth == 0:
-                    if '"findings"' in text[idx:j + 1]:
+                    candidate = text[idx:j + 1]
+                    try:
+                        parsed = _json.loads(candidate)
+                    except ValueError:
+                        parsed = None
+                    if isinstance(parsed, dict) and "findings" in parsed:
                         return text[:idx] + text[j + 1:]
                     break
         idx = text.find("{", idx + 1)

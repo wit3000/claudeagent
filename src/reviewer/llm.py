@@ -6,7 +6,7 @@ import os
 
 from tenacity import (
     AsyncRetrying,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -29,11 +29,24 @@ _MAX_TOKENS_KEYS = ("max_tokens", "max_completion_tokens")
 _OVERAGE_KEYS = (
     "limit", "maximum", "exceed", "too large", "at most", "too many",
 )
+#: Markers of a rate-limit / quota error. These mention the same words as a real
+#: budget rejection ("reduce your max_tokens", "limit exceeded"), so their
+#: presence vetoes the max_tokens classification to avoid a bogus 4096 fallback.
+_RATE_LIMIT_KEYS = (
+    "rate limit", "rate_limit", "requests per", "tokens per minute",
+    "tpm", "rpm", "429", "quota",
+)
 
 
 def _is_max_tokens_error(exc: BaseException) -> bool:
-    """True when the provider rejected the request for an oversized token budget."""
+    """True when the provider rejected the request for an oversized token budget.
+
+    Rate-limit / quota errors are excluded even when they name ``max_tokens``,
+    since throttling is not fixed by shrinking the output budget.
+    """
     msg = str(exc).lower()
+    if any(k in msg for k in _RATE_LIMIT_KEYS):
+        return False
     return any(k in msg for k in _MAX_TOKENS_KEYS) and any(
         k in msg for k in _OVERAGE_KEYS
     )
@@ -173,10 +186,20 @@ class LLMClient:
     async def _attempt(
         self, provider: BaseProvider, system: str, user: str, max_tokens: int
     ) -> LLMResponse:
+        retryable = provider.retryable_exceptions()
+
+        def _should_retry(exc: BaseException) -> bool:
+            # A budget rejection is deterministic: retrying the same oversized
+            # request only burns attempts, so let it surface at once for the
+            # single 4096 fallback instead of spinning RETRY_ATTEMPTS times.
+            if _is_max_tokens_error(exc):
+                return False
+            return isinstance(exc, retryable)
+
         retryer = AsyncRetrying(
             stop=stop_after_attempt(RETRY_ATTEMPTS),
             wait=wait_exponential(multiplier=2, min=2, max=8),
-            retry=retry_if_exception_type(provider.retryable_exceptions()),
+            retry=retry_if_exception(_should_retry),
             reraise=True,
         )
         async for attempt in retryer:

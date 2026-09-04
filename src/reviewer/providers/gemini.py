@@ -19,6 +19,25 @@ def _text_from_candidates(candidates) -> str:
     return "".join(out)
 
 
+#: Numeric value of the MAX_TOKENS finish reason in the genai enum; some SDK
+#: versions hand back a bare int instead of an enum with a ``.name``.
+_MAX_TOKENS_FINISH_VALUE = 2
+
+
+def _is_max_tokens_finish(finish_reason) -> bool:
+    """True for a length cut-off, tolerating enum, ``.name``, str, or bare int."""
+    if finish_reason is None:
+        return False
+    name = getattr(finish_reason, "name", None)
+    if name is not None:
+        return str(name) == "MAX_TOKENS"
+    if isinstance(finish_reason, str):
+        return finish_reason == "MAX_TOKENS"
+    if isinstance(finish_reason, int):
+        return finish_reason == _MAX_TOKENS_FINISH_VALUE
+    return str(finish_reason) == "MAX_TOKENS"
+
+
 def _response_from_raw(resp, elapsed_ms: int) -> LLMResponse:
     """Build an LLMResponse from a genai result, tolerating a MAX_TOKENS cut-off.
 
@@ -32,7 +51,7 @@ def _response_from_raw(resp, elapsed_ms: int) -> LLMResponse:
     truncated = False
     if candidates:
         finish_reason = getattr(candidates[0], "finish_reason", None)
-        truncated = str(getattr(finish_reason, "name", finish_reason)) == "MAX_TOKENS"
+        truncated = _is_max_tokens_finish(finish_reason)
     try:
         text = (resp.text or "").strip()
     except Exception:  # noqa: BLE001 — salvage partial output instead of failing
