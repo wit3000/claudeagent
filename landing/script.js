@@ -15,7 +15,7 @@
     CHASE_EASE: 0.15,   // коэффициент погони котёнка за точкой (lerp)
     JUMP_MS: 300,       // длительность прыжка (синхронно с CSS @keyframes)
     DOT_SIZE: 14,       // px (для справки; вид задаётся в CSS)
-    CAT_SIZE: 52,       // px (для справки; вид задаётся в CSS)
+    CAT_SIZE: 60,       // px (для справки; вид задаётся в CSS)
     Z_INDEX: 9999,      // (для справки; z-index задаётся в CSS)
     FLIP_DEADZONE: 2    // px, чтобы флип не дёргался у нуля
   };
@@ -144,6 +144,7 @@
     var facingLeft = false;
     var visible = true;
     var rafId = null;
+    var hotEl = null; // текущий подсвеченный лазером элемент (a/button)
 
     function setClass(name, on) {
       cat.classList.toggle(name, on);
@@ -239,6 +240,7 @@
       visible = false;
       dot.style.visibility = "hidden";
       cat.style.visibility = "hidden";
+      setHot(null); // курсор ушёл за окно — снимаем подсветку кнопки
     }
     function onEnter(e) {
       visible = true;
@@ -251,18 +253,26 @@
       ensureLoop();
     }
 
-    // Точка чуть крупнее над кликабельным (приятный микро-фидбек).
+    // Над кликабельным: точка крупнее + сама кнопка/ссылка подсвечивается.
+    // hotEl хранит текущий подсвеченный элемент; вешаем/снимаем класс на нём.
+    function setHot(el) {
+      if (hotEl === el) return;
+      if (hotEl) hotEl.classList.remove("laser-hot");
+      hotEl = el;
+      if (hotEl) hotEl.classList.add("laser-hot");
+      dot.classList.toggle("dot--hot", !!hotEl);
+    }
     function onOver(e) {
-      if (e.target.closest && e.target.closest("a,button")) {
-        dot.classList.add("dot--hot");
-      }
+      var t = e.target.closest && e.target.closest("a,button");
+      if (t) setHot(t);
     }
     function onOut(e) {
-      if (e.target.closest && e.target.closest("a,button")) {
-        if (!e.relatedTarget || !e.relatedTarget.closest ||
-            !e.relatedTarget.closest("a,button")) {
-          dot.classList.remove("dot--hot");
-        }
+      if (!e.target.closest || !e.target.closest("a,button")) return;
+      // Снимаем только если уходим не на другой кликабельный (onOver наведёт
+      // подсветку на новый элемент сам — без мигания).
+      var to = e.relatedTarget;
+      if (!to || !to.closest || !to.closest("a,button")) {
+        setHot(null);
       }
     }
 

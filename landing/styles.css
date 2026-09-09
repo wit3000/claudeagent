@@ -89,13 +89,42 @@ p { text-wrap: pretty; }
   margin-bottom: 20px;
 }
 .logo-mark { display: block; }
+/* Логотип «ХУЛИМЯО» — массивные объёмные буквы в стиле Battletoads.
+   Шрифт Baloo 2 (800) с полной кириллицей + фолбэк Arial Black (тоже
+   жирный), чтобы без веб-шрифта лого не разваливалось. */
 .logo-word {
-  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-family: "Baloo 2", "Arial Black", "Segoe UI", sans-serif;
+  font-size: clamp(2.8rem, 8vw, 5rem);
   font-weight: 800;
-  letter-spacing: .01em;
-  color: var(--brand);
-  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: .02em;
   line-height: 1;
+  margin: 0;
+  color: var(--brand);
+  /* Тёмная обводка (paint-order — чтобы обводка была под заливкой). */
+  -webkit-text-stroke: 2px var(--brand-dark);
+  paint-order: stroke fill;
+  /* Объём: лесенка тёмных теней вниз-вбок = экструзия 3D. */
+  text-shadow:
+    1px 1px 0 var(--brand-dark),
+    2px 2px 0 var(--brand-dark),
+    3px 3px 0 #322217,
+    4px 4px 0 #322217,
+    5px 5px 0 #2a1d13,
+    6px 6px 0 #2a1d13,
+    7px 7px 0 #221710,
+    8px 8px 0 #221710,
+    9px 11px 16px rgba(0, 0, 0, .35);
+}
+/* Блик сверху + заливка градиентом лица букв. Под @supports, чтобы при
+   отсутствии background-clip:text текст оставался залит --brand (не пропал). */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .logo-word {
+    background: linear-gradient(180deg, var(--cream) 0%, #FFC178 32%, var(--brand) 62%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .hero__lead {
@@ -379,56 +408,138 @@ body.cursor-fx #cat { display: block; }
 /* Точка «поймана» котёнком в IDLE — притухает под лапами. */
 #laser-dot.dot--caught { opacity: 0; }
 
-/* Котёнок: центрируем спрайт на координате. */
+/* Котёнок: центрируем спрайт (60px) на координате. */
 #cat {
-  margin: -26px 0 0 -26px;
+  margin: -30px 0 0 -30px;
 }
 .cat-svg { display: block; }
 
-/* Флип по направлению движения (класс вешает JS). */
+/* Точки вращения частей рига. transform-box:fill-box → origin в % считается
+   от собственного bbox каждой части (предсказуемо в браузерах). */
+.cat-rig,
+.cat-body,
+.cat-head,
+.cat-tail,
+.cat-leg,
+.cat-eye {
+  transform-box: fill-box;
+}
+.cat-rig  { transform-origin: 50% 100%; }  /* приземистость от «пола» */
+.cat-body { transform-origin: 50% 100%; }
+.cat-head { transform-origin: 40% 100%; }  /* шея у низа головы */
+.cat-tail { transform-origin: 100% 100%; } /* основание хвоста у корпуса */
+.cat-leg  { transform-origin: 50% 0%; }    /* бедро/плечо — верх лапы */
+.cat-eye  { transform-origin: 50% 50%; }
+
+/* Флип по направлению движения — на .cat-svg, чтобы не конфликтовал с
+   внутренними анимациями частей (класс вешает JS). */
 #cat.cat--flip .cat-svg { transform: scaleX(-1); }
 
-/* --- Состояние: бежит (лапки топочут, лёгкое подпрыгивание) --- */
-#cat.cat--running .cat-svg { animation: cat-bob .32s ease-in-out infinite; }
-#cat.cat--running .cat-paw--l { animation: paw-l .32s ease-in-out infinite; }
-#cat.cat--running .cat-paw--r { animation: paw-r .32s ease-in-out infinite; }
-@keyframes cat-bob {
-  0%, 100% { translate: 0 0; }
-  50%      { translate: 0 -4px; }
+/* --- Состояние: бежит — реальный шаговый цикл --- */
+/* Диагональные пары лап в противофазе (fl+br против fr+bl). */
+#cat.cat--running .cat-rig  { animation: run-body .34s ease-in-out infinite; }
+#cat.cat--running .cat-head { animation: run-head .34s ease-in-out infinite; }
+#cat.cat--running .cat-tail { animation: run-tail .5s ease-in-out infinite; }
+#cat.cat--running .cat-leg  { animation: leg-swing .34s linear infinite; }
+#cat.cat--running .cat-leg--fr,
+#cat.cat--running .cat-leg--bl { animation-delay: -.17s; }
+@keyframes leg-swing {
+  0%   { rotate: 22deg; }
+  50%  { rotate: -22deg; }
+  100% { rotate: 22deg; }
 }
-@keyframes paw-l {
-  0%, 100% { translate: 0 0; }
-  50%      { translate: -3px 3px; }
+@keyframes run-body {
+  0%, 100% { translate: 0 0;    scale: 1 1; }
+  25%      { translate: 0 -4px; scale: .98 1.02; }
+  50%      { translate: 0 0;    scale: 1.02 .98; }
+  75%      { translate: 0 -4px; scale: .98 1.02; }
 }
-@keyframes paw-r {
-  0%, 100% { translate: 0 0; }
-  50%      { translate: 3px 3px; }
+@keyframes run-head {
+  0%, 100% { rotate: -2deg; translate: 0 0; }
+  50%      { rotate: 2deg;  translate: 0 -2px; }
+}
+@keyframes run-tail {
+  0%, 100% { rotate: 9deg; }
+  50%      { rotate: -11deg; }
 }
 
-/* --- Состояние: прыжок (короткая дуга вверх) --- */
-#cat.cat--jumping .cat-svg { animation: cat-jump var(--jump-ms, 300ms) ease-out; }
+/* --- Состояние: прыжок — дуга с фазами: присед → взлёт(stretch) → приземление --- */
+#cat.cat--jumping .cat-rig {
+  animation: cat-jump var(--jump-ms, 300ms) cubic-bezier(.3, 0, .4, 1) both;
+}
+#cat.cat--jumping .cat-leg--fl,
+#cat.cat--jumping .cat-leg--fr {
+  animation: jump-front var(--jump-ms, 300ms) ease-out both;
+}
+#cat.cat--jumping .cat-leg--bl,
+#cat.cat--jumping .cat-leg--br {
+  animation: jump-back var(--jump-ms, 300ms) ease-out both;
+}
 @keyframes cat-jump {
-  0%   { translate: 0 0;    scale: 1 1; }
-  45%  { translate: 0 -22px; scale: 1.05 .95; }
-  100% { translate: 0 0;    scale: 1 1; }
+  0%   { translate: 0 3px;   scale: 1.12 .88; }  /* присед/замах — squash */
+  15%  { translate: 0 5px;   scale: 1.14 .86; }  /* глубже присед */
+  55%  { translate: 0 -24px; scale: .9 1.12; }   /* взлёт — stretch, пик дуги */
+  82%  { translate: 0 -4px;  scale: 1.02 .98; }  /* снижение */
+  90%  { translate: 0 0;     scale: 1.08 .92; }  /* касание точки — squash */
+  100% { translate: 0 0;     scale: 1 1; }       /* осел ровно, без попа в sitting */
+}
+@keyframes jump-front {
+  0%   { rotate: 26deg; }   /* лапы сгруппированы под телом */
+  15%  { rotate: 34deg; }
+  55%  { rotate: -28deg; }  /* вытянуты вперёд к точке */
+  100% { rotate: -12deg; }  /* идут накрывать */
+}
+@keyframes jump-back {
+  0%   { rotate: -24deg; }
+  15%  { rotate: -34deg; }
+  55%  { rotate: 26deg; }   /* оттолкнулись, вытянуты назад на взлёте */
+  100% { rotate: 6deg; }
 }
 
-/* --- Состояние: сидит довольный (моргание + дёрганье хвоста) --- */
-#cat.cat--sitting .cat-eye { animation: cat-blink 3.2s ease-in-out infinite; }
-#cat.cat--sitting .cat-tail { animation: cat-tail 2.4s ease-in-out infinite; transform-origin: 96px 84px; }
-#cat.cat--sitting .cat-paw--l { translate: 6px -6px; }
-#cat.cat--sitting .cat-paw--r { translate: -6px -6px; }
-@keyframes cat-blink {
-  0%, 92%, 100% { scale: 1 1; }
-  96%           { scale: 1 .1; }
+/* --- Состояние: сидит довольный — лапы накрыли точку + idle-петля --- */
+#cat.cat--sitting .cat-body { animation: sit-breathe 3.6s ease-in-out infinite; }
+#cat.cat--sitting .cat-tail { animation: sit-tail 2.6s ease-in-out infinite; }
+#cat.cat--sitting .cat-eye  { animation: sit-blink 3.6s ease-in-out infinite; }
+/* передние лапы сведены поверх точки, задние подобраны */
+#cat.cat--sitting .cat-leg--fl { transform: rotate(-26deg) translateY(3px); }
+#cat.cat--sitting .cat-leg--fr { transform: rotate(-34deg) translateY(3px); }
+#cat.cat--sitting .cat-leg--bl { transform: rotate(8deg); }
+#cat.cat--sitting .cat-leg--br { transform: rotate(4deg); }
+@keyframes sit-breathe {
+  0%, 100% { scale: 1 1; }
+  50%      { scale: 1.015 1.03; }
 }
-@keyframes cat-tail {
+@keyframes sit-tail {
   0%, 100% { rotate: 0deg; }
-  50%      { rotate: -12deg; }
+  15%      { rotate: -9deg; }
+  30%      { rotate: 3deg; }
+  45%      { rotate: -5deg; }
+  60%      { rotate: 0deg; }
+}
+@keyframes sit-blink {
+  0%, 92%, 100% { scale: 1 1; }
+  95%           { scale: 1 .1; }
+  98%           { scale: 1 1; }
 }
 
 /* Точка чуть крупнее над кликабельным (класс вешает JS). */
 #laser-dot.dot--hot { scale: 1.6; }
+
+/* Подсветка самой кнопки, на которую наведён лазер (класс вешает JS на любой
+   a/button, но заметный эффект — только для настоящих кнопок .btn/.fab, чтобы
+   inline-ссылки не получали прямоугольное свечение). Сильнее обычного :hover:
+   свечение в цвет лазера + подъём и scale. body.cursor-fx поднимает
+   специфичность выше .btn:hover, чтобы перебивала. */
+body.cursor-fx .btn.laser-hot,
+body.cursor-fx .fab.laser-hot {
+  box-shadow:
+    0 0 0 3px rgba(255, 61, 45, .5),
+    0 0 20px 6px rgba(255, 61, 45, .6),
+    var(--shadow);
+  transform: translateY(-2px) scale(1.05);
+  filter: brightness(1.06);
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
 
 /* ============================================================
    prefers-reduced-motion — глушим все @keyframes фишки и переходы
@@ -436,13 +547,21 @@ body.cursor-fx #cat { display: block; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   #laser-dot,
-  #cat .cat-svg,
-  #cat .cat-paw,
-  #cat .cat-eye,
-  #cat .cat-tail {
+  #cat .cat-rig,
+  #cat .cat-body,
+  #cat .cat-head,
+  #cat .cat-tail,
+  #cat .cat-leg,
+  #cat .cat-eye {
     animation: none !important;
   }
   .btn { transition: none; }
+  /* Подсветка кнопок без резкого scale/перехода — оставляем только свечение. */
+  body.cursor-fx .btn.laser-hot,
+  body.cursor-fx .fab.laser-hot {
+    transform: none;
+    transition: none;
+  }
 }
 
 /* ============================================================

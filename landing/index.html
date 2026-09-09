@@ -7,8 +7,9 @@
   <meta name="description" content="Хулимяо — игрушки для кошек из натуральных материалов: прочные, безопасные и дешевле, чем в магазине.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Google Font с обязательным фолбэком в CSS. Если не загрузится — вёрстка не ломается. -->
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- Google Fonts с обязательным фолбэком в CSS. Если не загрузятся — вёрстка не ломается.
+       Baloo 2 (800) — жирный округлый bubble-шрифт с полной кириллицей для логотипа. -->
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -48,6 +49,8 @@
             <line x1="90" y1="84" x2="72" y2="84"/>
           </g>
         </svg>
+        <!-- Визуально капсом делает text-transform в CSS; в DOM — обычный
+             регистр, чтобы скринридеры читали слово, а не по буквам. -->
         <h1 class="logo-word">Хулимяо</h1>
       </a>
 
@@ -275,32 +278,73 @@
   <!-- ==================== СЛОЙ КУРСОРА-ФИШКИ (декоративный) ==================== -->
   <div id="laser-dot" aria-hidden="true"></div>
   <div id="cat" aria-hidden="true">
-    <svg class="cat-svg" viewBox="0 0 120 120" width="52" height="52" aria-hidden="true" focusable="false">
-      <!-- хвост -->
-      <path class="cat-tail" d="M96 84 q26 -6 20 -34" stroke="#F5892E" stroke-width="10" fill="none" stroke-linecap="round"/>
-      <!-- задние/передние лапки -->
-      <ellipse class="cat-paw cat-paw--l" cx="46" cy="104" rx="9" ry="6" fill="#F5892E"/>
-      <ellipse class="cat-paw cat-paw--r" cx="74" cy="104" rx="9" ry="6" fill="#F5892E"/>
-      <!-- тело -->
-      <ellipse cx="60" cy="86" rx="30" ry="24" fill="#F5892E"/>
-      <ellipse cx="60" cy="92" rx="18" ry="15" fill="#FFE7D1"/>
-      <!-- уши -->
-      <path d="M30 52 L24 26 L50 44 Z" fill="#F5892E"/>
-      <path d="M90 52 L96 26 L70 44 Z" fill="#F5892E"/>
-      <path d="M33 49 L30 34 L46 45 Z" fill="#FFC79A"/>
-      <path d="M87 49 L90 34 L74 45 Z" fill="#FFC79A"/>
-      <!-- голова -->
-      <circle cx="60" cy="58" r="30" fill="#F5892E"/>
-      <ellipse cx="60" cy="66" rx="20" ry="15" fill="#FFE7D1"/>
-      <!-- глаза -->
-      <circle class="cat-eye cat-eye--l" cx="50" cy="55" r="4" fill="#3A2A1E"/>
-      <circle class="cat-eye cat-eye--r" cx="70" cy="55" r="4" fill="#3A2A1E"/>
-      <!-- нос -->
-      <path d="M56 63 L64 63 L60 68 Z" fill="#E06A4E"/>
-      <!-- усы -->
-      <g stroke="#3A2A1E" stroke-width="2" stroke-linecap="round">
-        <line x1="34" y1="63" x2="48" y2="64"/>
-        <line x1="86" y1="63" x2="72" y2="64"/>
+    <!-- Риггованный котёнок: части — отдельные группы с собственными
+         transform-origin (заданы в styles.css). Позу/движение частей задают
+         @keyframes по классам состояния; флип — на .cat-svg, чтобы не
+         конфликтовать с внутренними анимациями на .cat-rig. Котёнок по
+         умолчанию смотрит вправо. -->
+    <svg class="cat-svg" viewBox="0 0 120 120" width="60" height="60" aria-hidden="true" focusable="false">
+      <g class="cat-rig">
+        <!-- ХВОСТ (за телом), основание у корпуса -->
+        <g class="cat-tail">
+          <path d="M28 78 C6 74 4 46 20 38" stroke="#F5892E" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <path d="M14 46 l7 3 M11 58 l7 2" stroke="#C85A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <!-- ЗАДНИЕ ЛАПЫ (за телом) -->
+        <rect class="cat-leg cat-leg--bl" x="28" y="82" width="11" height="26" rx="5" fill="#E77A22"/>
+        <rect class="cat-leg cat-leg--br" x="40" y="82" width="11" height="26" rx="5" fill="#F5892E"/>
+
+        <!-- ТЕЛО + кремовый живот + полоски -->
+        <g class="cat-body">
+          <ellipse cx="50" cy="74" rx="31" ry="21" fill="#F5892E"/>
+          <ellipse cx="54" cy="82" rx="21" ry="12" fill="#FFE7D1"/>
+          <path d="M40 56 q4 8 2 16 M52 54 q4 9 1 18 M64 56 q3 8 1 15"
+                stroke="#C85A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <!-- ПЕРЕДНИЕ ЛАПЫ (перед телом) -->
+        <rect class="cat-leg cat-leg--fl" x="62" y="82" width="11" height="26" rx="5" fill="#E77A22"/>
+        <rect class="cat-leg cat-leg--fr" x="73" y="82" width="11" height="26" rx="5" fill="#F5892E"/>
+
+        <!-- ГОЛОВА: уши, мордочка, глаза, нос, усы -->
+        <g class="cat-head">
+          <!-- уши -->
+          <path d="M58 32 L52 10 L74 26 Z" fill="#F5892E"/>
+          <path d="M80 26 L98 10 L92 34 Z" fill="#F5892E"/>
+          <path d="M61 31 L58 18 L71 27 Z" fill="#FFC79A"/>
+          <path d="M83 28 L94 17 L90 32 Z" fill="#FFC79A"/>
+          <!-- череп -->
+          <circle cx="74" cy="48" r="24" fill="#F5892E"/>
+          <!-- полоски на лбу -->
+          <path d="M68 26 l3 9 M76 24 l0 10 M84 26 l-3 9"
+                stroke="#C85A2A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <!-- кремовая мордочка -->
+          <ellipse cx="74" cy="56" rx="18" ry="14" fill="#FFE7D1"/>
+          <!-- глаза (зелёные), группа целиком мигает -->
+          <g class="cat-eye cat-eye--l">
+            <ellipse cx="65" cy="46" rx="6" ry="7.5" fill="#5FB35A"/>
+            <circle cx="65" cy="46" r="3.2" fill="#20180F"/>
+            <circle cx="66.6" cy="43.6" r="1.5" fill="#FFFFFF"/>
+          </g>
+          <g class="cat-eye cat-eye--r">
+            <ellipse cx="83" cy="46" rx="6" ry="7.5" fill="#5FB35A"/>
+            <circle cx="83" cy="46" r="3.2" fill="#20180F"/>
+            <circle cx="84.6" cy="43.6" r="1.5" fill="#FFFFFF"/>
+          </g>
+          <!-- нос -->
+          <path d="M70 55 L78 55 L74 60 Z" fill="#E8859A"/>
+          <!-- пасть с улыбкой -->
+          <path d="M74 60 q-6 6 -11 3 M74 60 q6 6 11 3"
+                stroke="#3A2A1E" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- усы -->
+          <g stroke="#3A2A1E" stroke-width="2" stroke-linecap="round">
+            <line x1="56" y1="56" x2="66" y2="57"/>
+            <line x1="56" y1="62" x2="66" y2="61"/>
+            <line x1="92" y1="56" x2="82" y2="57"/>
+            <line x1="92" y1="62" x2="82" y2="61"/>
+          </g>
+        </g>
       </g>
     </svg>
   </div>
