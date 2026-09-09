@@ -108,21 +108,25 @@ p { text-wrap: pretty; }
    остаётся жирным и читаемым. */
 .logo-word {
   font-family: "Overdoze Sans", "Commissioner", "Arial Black", sans-serif;
-  font-size: clamp(2.8rem, 8vw, 5rem);
+  font-size: clamp(3.4rem, 10vw, 6.5rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .01em;
   line-height: 1;
   margin: 0;
-  /* Чистый оранжевый — без градиент-клипа и многослойной экструзии. */
+  /* Чистый оранжевый — без градиент-клипа. */
   color: var(--brand);
   /* Тонкая тёмная обводка ради читаемости на кремовом hero (1px, не «объём»). */
   -webkit-text-stroke: 1px var(--brand-dark);
   paint-order: stroke fill;
-  /* Одна-две мягкие тени: лёгкая опора снизу + деликатное размытие. */
+  /* Деликатный «пряничный» объём: короткая экструзия в тёмно-оранжевой
+     гамме (не чёрной) + одна мягкая размытая опорная тень. */
   text-shadow:
-    0 2px 0 #D9722340,
-    0 6px 14px rgba(58, 42, 30, .28);
+    0 1px 0 #E0721E,
+    0 2px 0 #CC6519,
+    0 3px 0 #B85916,
+    0 4px 0 #A44E13,
+    0 8px 16px rgba(58, 42, 30, .24);
 }
 
 .hero__lead {
