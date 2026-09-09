@@ -1,0 +1,459 @@
+/* ============================================================
+   Хулимяо — стили лендинга
+   Вид, раскладка, адаптив и декларативные (@keyframes) анимации.
+   Координаты курсора/котёнка и переключение состояний — в script.js.
+   ============================================================ */
+
+:root {
+  --brand: #F5892E;        /* рыжий бренда */
+  --brand-dark: #3A2A1E;   /* тёмный текст / обводки */
+  --brand-nose: #E06A4E;
+  --cream: #FFE7D1;
+  --cream-2: #FFC79A;
+  --bg: #FFFDFB;
+  --bg-tint: #FFF3E8;
+  --text: #2B2019;
+  --muted: #6B5D52;
+  --white: #ffffff;
+  --radius: 16px;
+  --shadow: 0 8px 24px rgba(58, 42, 30, 0.10);
+  --max: 1080px;
+  --font: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Скрываем нативный курсор только когда фича активна (класс ставит JS). */
+body.cursor-fx { cursor: none; }
+/* Внутри активной фичи интерактив тоже без системного курсора (котёнок рисует сам). */
+body.cursor-fx a,
+body.cursor-fx button { cursor: none; }
+
+img, svg { max-width: 100%; }
+
+a { color: inherit; }
+
+.container {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ---------- Типографика заголовков ---------- */
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+.section { padding: 64px 0; }
+.section--tint { background: var(--bg-tint); }
+.section__title {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 12px;
+  color: var(--brand-dark);
+}
+.section__lead {
+  text-align: center;
+  color: var(--muted);
+  max-width: 640px;
+  margin: 0 auto 36px;
+}
+
+/* ============================================================
+   HERO / HEADER
+   ============================================================ */
+.hero {
+  background: linear-gradient(160deg, #FFF7EF 0%, #FFEBD8 100%);
+  padding: 40px 0 64px;
+  text-align: center;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.logo-mark { display: block; }
+.logo-word {
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-weight: 800;
+  letter-spacing: .01em;
+  color: var(--brand);
+  margin: 0;
+  line-height: 1;
+}
+
+.hero__lead {
+  font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+  font-weight: 700;
+  color: var(--brand-dark);
+  max-width: 720px;
+  margin: 0 auto 20px;
+}
+
+.hero__usp {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto 28px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 16px;
+  max-width: 760px;
+}
+.hero__usp li {
+  background: var(--white);
+  border: 1px solid var(--cream-2);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--brand-dark);
+  box-shadow: var(--shadow);
+}
+
+.hero__visual {
+  margin: 36px auto 0;
+  max-width: 760px;
+  aspect-ratio: 16 / 8;
+  border-radius: var(--radius);
+  background:
+    repeating-linear-gradient(45deg, #FFE1C4 0 16px, #FFEAD6 16px 32px);
+  border: 2px dashed var(--cream-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+.hero__visual small { font-weight: 600; opacity: .7; }
+
+/* ============================================================
+   КНОПКИ
+   ============================================================ */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+.cta-row--big { margin-top: 8px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  border: 2px solid transparent;
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.btn:focus-visible { outline: 3px solid var(--brand-dark); outline-offset: 2px; }
+
+.btn--primary { background: var(--brand); color: var(--white); }
+.btn--ghost {
+  background: var(--white);
+  color: var(--brand-dark);
+  border-color: var(--brand);
+}
+.btn--wa { background: #25D366; color: #06331b; }
+.btn--tg { background: #2AABEE; color: #04283a; }
+
+.cta-row--big .btn { min-width: 160px; }
+
+/* ============================================================
+   КАРТОЧКИ КАТЕГОРИЙ
+   ============================================================ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+.card {
+  background: var(--white);
+  border: 1px solid var(--cream-2);
+  border-radius: var(--radius);
+  padding: 22px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.card__media {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--bg-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card__media svg { width: 48px; height: 48px; }
+.card__title { margin: 0 0 8px; font-size: 1.15rem; color: var(--brand-dark); }
+.card__text { margin: 0; color: var(--muted); font-size: .95rem; }
+
+/* ============================================================
+   ПОЧЕМУ ХУЛИМЯО (3 блока)
+   ============================================================ */
+.why-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.why-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.why-card__icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+}
+.why-card__title { font-size: 1.25rem; color: var(--brand-dark); margin: 0 0 10px; }
+.why-card__text { margin: 0; color: var(--muted); }
+
+/* ============================================================
+   БЛОК ЦЕН
+   ============================================================ */
+.price-wrap { overflow-x: auto; }
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  min-width: 460px;
+}
+.price-table th,
+.price-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--bg-tint);
+}
+.price-table thead th {
+  background: var(--brand);
+  color: var(--white);
+  font-weight: 700;
+}
+.price-table tbody tr:last-child td { border-bottom: none; }
+.price-table .col-ours { font-weight: 800; color: var(--brand-dark); }
+.price-table .col-offline { color: var(--muted); text-decoration: line-through; }
+.price-badge {
+  display: inline-block;
+  background: #E9F9EE;
+  color: #147a3d;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: .9rem;
+  white-space: nowrap;
+}
+.price-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: .9rem;
+  margin: 18px auto 0;
+  max-width: 560px;
+}
+
+/* ============================================================
+   ДОВЕРИЕ
+   ============================================================ */
+.about { max-width: 760px; text-align: center; }
+.about__text { color: var(--muted); font-size: 1.05rem; }
+
+/* ============================================================
+   ФИНАЛЬНЫЙ CTA
+   ============================================================ */
+.section--cta {
+  background: linear-gradient(160deg, #FFEBD8 0%, #FFDCC0 100%);
+}
+
+/* ============================================================
+   ФУТЕР
+   ============================================================ */
+.footer {
+  background: var(--brand-dark);
+  color: #F3E7DD;
+  padding: 40px 0 24px;
+  text-align: center;
+}
+.footer__brand { font-size: 1.5rem; font-weight: 800; color: var(--brand); margin: 0 0 12px; }
+.footer__contacts {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0 0 12px;
+}
+.footer__contacts a { color: #F3E7DD; text-decoration: none; font-weight: 600; }
+.footer__contacts a:hover { text-decoration: underline; }
+.footer__copy { margin: 0 0 18px; color: #C8B6A8; font-size: .9rem; }
+.footer__sign {
+  margin: 0;
+  color: #7E6E62;
+  font-size: .78rem;
+  letter-spacing: .02em;
+}
+
+/* ============================================================
+   ЛИПКАЯ КНОПКА (FAB) — только на узких экранах
+   ============================================================ */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #25D366;
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  z-index: 900;
+}
+@media (max-width: 768px) {
+  .fab { display: flex; }
+}
+
+/* ============================================================
+   СЛОЙ КУРСОРА-ФИШКИ
+   Позиции пишет JS через transform: translate3d(). По умолчанию
+   элементы скрыты — JS показывает их, только когда фича активна.
+   ============================================================ */
+#laser-dot,
+#cat {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform;
+  display: none;               /* включает JS классом на body */
+  transform: translate3d(-100px, -100px, 0);
+}
+body.cursor-fx #laser-dot,
+body.cursor-fx #cat { display: block; }
+
+/* Лазерная точка */
+#laser-dot {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;        /* центрируем на координате */
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+              #fff 0%, #ff4d3d 35%, #d1170a 70%, rgba(209,23,10,0) 100%);
+  box-shadow: 0 0 8px 3px rgba(255, 61, 45, 0.75);
+  animation: dot-pulse 1.1s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 8px 3px rgba(255, 61, 45, 0.65); }
+  50%      { box-shadow: 0 0 14px 5px rgba(255, 61, 45, 0.95); }
+}
+/* Точка «поймана» котёнком в IDLE — притухает под лапами. */
+#laser-dot.dot--caught { opacity: 0; }
+
+/* Котёнок: центрируем спрайт на координате. */
+#cat {
+  margin: -26px 0 0 -26px;
+}
+.cat-svg { display: block; }
+
+/* Флип по направлению движения (класс вешает JS). */
+#cat.cat--flip .cat-svg { transform: scaleX(-1); }
+
+/* --- Состояние: бежит (лапки топочут, лёгкое подпрыгивание) --- */
+#cat.cat--running .cat-svg { animation: cat-bob .32s ease-in-out infinite; }
+#cat.cat--running .cat-paw--l { animation: paw-l .32s ease-in-out infinite; }
+#cat.cat--running .cat-paw--r { animation: paw-r .32s ease-in-out infinite; }
+@keyframes cat-bob {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -4px; }
+}
+@keyframes paw-l {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: -3px 3px; }
+}
+@keyframes paw-r {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 3px 3px; }
+}
+
+/* --- Состояние: прыжок (короткая дуга вверх) --- */
+#cat.cat--jumping .cat-svg { animation: cat-jump var(--jump-ms, 300ms) ease-out; }
+@keyframes cat-jump {
+  0%   { translate: 0 0;    scale: 1 1; }
+  45%  { translate: 0 -22px; scale: 1.05 .95; }
+  100% { translate: 0 0;    scale: 1 1; }
+}
+
+/* --- Состояние: сидит довольный (моргание + дёрганье хвоста) --- */
+#cat.cat--sitting .cat-eye { animation: cat-blink 3.2s ease-in-out infinite; }
+#cat.cat--sitting .cat-tail { animation: cat-tail 2.4s ease-in-out infinite; transform-origin: 96px 84px; }
+#cat.cat--sitting .cat-paw--l { translate: 6px -6px; }
+#cat.cat--sitting .cat-paw--r { translate: -6px -6px; }
+@keyframes cat-blink {
+  0%, 92%, 100% { scale: 1 1; }
+  96%           { scale: 1 .1; }
+}
+@keyframes cat-tail {
+  0%, 100% { rotate: 0deg; }
+  50%      { rotate: -12deg; }
+}
+
+/* Точка чуть крупнее над кликабельным (класс вешает JS). */
+#laser-dot.dot--hot { scale: 1.6; }
+
+/* ============================================================
+   prefers-reduced-motion — глушим все @keyframes фишки и переходы
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  #laser-dot,
+  #cat .cat-svg,
+  #cat .cat-paw,
+  #cat .cat-eye,
+  #cat .cat-tail {
+    animation: none !important;
+  }
+  .btn { transition: none; }
+}
+
+/* ============================================================
+   АДАПТИВ
+   ============================================================ */
+@media (max-width: 900px) {
+  .why-cards { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+}
+@media (max-width: 480px) {
+  .section { padding: 48px 0; }
+  .cta-row { flex-direction: column; align-items: stretch; }
+  .cta-row .btn { width: 100%; }
+  .hero__usp li { width: 100%; text-align: center; }
+}

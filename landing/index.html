@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Хулимяо — натуральные игрушки для кошек</title>
+  <meta name="description" content="Хулимяо — игрушки для кошек из натуральных материалов: прочные, безопасные и дешевле, чем в магазине.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Font с обязательным фолбэком в CSS. Если не загрузится — вёрстка не ломается. -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ==================== HEADER / HERO ==================== -->
+  <header class="hero" id="top">
+    <div class="container">
+
+      <!-- Логотип: мордочка (SVG) над названием, по центру, вверху -->
+      <a class="logo" href="#top" aria-label="Хулимяо, на главную">
+        <svg class="logo-mark" viewBox="0 0 120 120" role="img"
+             aria-label="Хулимяо — игрушки для кошек" width="72" height="72">
+          <!-- уши -->
+          <path d="M28 46 L20 14 L52 34 Z" fill="#F5892E"/>
+          <path d="M92 46 L100 14 L68 34 Z" fill="#F5892E"/>
+          <path d="M31 42 L26 24 L46 36 Z" fill="#FFC79A"/>
+          <path d="M89 42 L94 24 L74 36 Z" fill="#FFC79A"/>
+          <!-- голова -->
+          <circle cx="60" cy="66" r="40" fill="#F5892E"/>
+          <!-- светлая мордочка -->
+          <ellipse cx="60" cy="78" rx="26" ry="20" fill="#FFE7D1"/>
+          <!-- глаза (довольные, прищур) -->
+          <path d="M42 66 q6 -8 12 0" stroke="#3A2A1E" stroke-width="4"
+                fill="none" stroke-linecap="round"/>
+          <path d="M66 66 q6 -8 12 0" stroke="#3A2A1E" stroke-width="4"
+                fill="none" stroke-linecap="round"/>
+          <!-- нос -->
+          <path d="M56 76 L64 76 L60 82 Z" fill="#E06A4E"/>
+          <!-- рот (довольный) -->
+          <path d="M60 82 q-6 8 -12 4 M60 82 q6 8 12 4" stroke="#3A2A1E"
+                stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- усы -->
+          <g stroke="#3A2A1E" stroke-width="2.5" stroke-linecap="round">
+            <line x1="30" y1="76" x2="48" y2="78"/>
+            <line x1="30" y1="84" x2="48" y2="84"/>
+            <line x1="90" y1="76" x2="72" y2="78"/>
+            <line x1="90" y1="84" x2="72" y2="84"/>
+          </g>
+        </svg>
+        <h1 class="logo-word">Хулимяо</h1>
+      </a>
+
+      <p class="hero__lead">Игрушки для&nbsp;кошек из&nbsp;натуральных материалов&nbsp;— прочные и&nbsp;дешевле, чем в&nbsp;магазине</p>
+
+      <ul class="hero__usp" aria-label="Наши преимущества">
+        <li>Только натуральные и&nbsp;безопасные материалы</li>
+        <li>Прочные&nbsp;— не&nbsp;разгрызёт за&nbsp;неделю</li>
+        <li>Цена ниже, чем в&nbsp;офлайн-магазине</li>
+      </ul>
+
+      <div class="cta-row">
+        <!-- Базовый href — рабочий фолбэк; JS добавит префилл-текст из CONTACTS. -->
+        <a class="btn btn--primary" data-contact="whatsapp"
+           href="https://wa.me/79161234567"
+           target="_blank" rel="noopener noreferrer">Написать в&nbsp;мессенджер</a>
+        <a class="btn btn--ghost" data-contact="phone" href="tel:+79161234567">Позвонить</a>
+      </div>
+
+      <!-- Визуал-плейсхолдер. TODO: заменить фото -->
+      <div class="hero__visual" role="img" aria-label="Фото игрушек Хулимяо (плейсхолдер)">
+        <span>Фото игрушек Хулимяо<br><small>TODO: заменить фото</small></span>
+      </div>
+
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ==================== КАТЕГОРИИ ==================== -->
+    <section id="categories" class="section">
+      <div class="container">
+        <h2 class="section__title">Что у&nbsp;нас есть</h2>
+        <p class="section__lead">Пять категорий игрушек&nbsp;— на&nbsp;любой характер и&nbsp;настроение котика.</p>
+
+        <div class="cards">
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Удочки-дразнилки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <line x1="10" y1="52" x2="46" y2="14" stroke="#3A2A1E" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="48" cy="12" r="6" fill="#F5892E"/>
+                <path d="M48 12 l8 -4 M48 12 l7 3 M48 12 l3 8" stroke="#E06A4E" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Удочки-дразнилки</h3>
+            <p class="card__text">Активная игра вдвоём: перо, ленты и&nbsp;хвостики на&nbsp;прочной удочке.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Пирамидки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <rect x="14" y="40" width="36" height="10" rx="3" fill="#F5892E"/>
+                <rect x="20" y="28" width="24" height="10" rx="3" fill="#FFC79A"/>
+                <rect x="26" y="16" width="12" height="10" rx="3" fill="#E06A4E"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Пирамидки</h3>
+            <p class="card__text">Головоломки с&nbsp;шариками и&nbsp;треками&nbsp;— развивают ловкость.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Когтеточки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <rect x="26" y="12" width="12" height="40" rx="3" fill="#FFC79A"/>
+                <rect x="18" y="50" width="28" height="6" rx="3" fill="#F5892E"/>
+                <line x1="32" y1="16" x2="32" y2="48" stroke="#E06A4E" stroke-width="2"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Когтеточки</h3>
+            <p class="card__text">Спасают мебель: натуральный джут и&nbsp;устойчивое основание.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Мышки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <ellipse cx="30" cy="40" rx="18" ry="12" fill="#F5892E"/>
+                <circle cx="16" cy="30" r="7" fill="#FFC79A"/>
+                <path d="M46 42 q12 2 10 12" stroke="#3A2A1E" stroke-width="3" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Мышки</h3>
+            <p class="card__text">Лёгкие мышки для&nbsp;охоты&nbsp;— котик гоняет их&nbsp;по&nbsp;всей квартире.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Автоматические игрушки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <circle cx="32" cy="34" r="18" fill="#FFC79A"/>
+                <circle cx="32" cy="34" r="7" fill="#F5892E"/>
+                <path d="M32 8 v6 M32 54 v6 M6 34 h6 M52 34 h6" stroke="#E06A4E" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Автоматические игрушки</h3>
+            <p class="card__text">Двигаются сами и&nbsp;не&nbsp;дают заскучать, пока вас нет дома.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ПОЧЕМУ ХУЛИМЯО (УТП) ==================== -->
+    <section id="usp" class="section section--tint">
+      <div class="container">
+        <h2 class="section__title">Почему Хулимяо</h2>
+
+        <div class="why-cards">
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Щит с лапкой (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <path d="M32 6 L54 14 V32 C54 46 44 54 32 58 C20 54 10 46 10 32 V14 Z" fill="#F5892E"/>
+                <circle cx="32" cy="30" r="6" fill="#FFE7D1"/>
+                <circle cx="24" cy="22" r="3" fill="#FFE7D1"/>
+                <circle cx="32" cy="19" r="3" fill="#FFE7D1"/>
+                <circle cx="40" cy="22" r="3" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Любимая игрушка&nbsp;— на&nbsp;всю жизнь</h3>
+            <p class="why-card__text">Натуральные материалы и&nbsp;честная сборка: игрушка не&nbsp;разлохматится через неделю и&nbsp;останется любимой у&nbsp;вашего питомца на&nbsp;всю его жизнь.</p>
+          </article>
+
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Удочка и домик (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <line x1="8" y1="46" x2="30" y2="20" stroke="#3A2A1E" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="31" cy="18" r="5" fill="#E06A4E"/>
+                <path d="M40 50 V34 L52 26 L64 34 V50 Z" fill="#F5892E"/>
+                <rect x="48" y="40" width="8" height="10" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Весело вместе и&nbsp;врозь</h3>
+            <p class="why-card__text">Дразнилкой играть с&nbsp;котиком интересно вам обоим, а&nbsp;отдельные игрушки не&nbsp;дадут ему заскучать, пока вас нет дома.</p>
+          </article>
+
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Сердечко и камера (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <path d="M32 52 C12 38 12 22 24 22 C30 22 32 28 32 28 C32 28 34 22 40 22 C52 22 52 38 32 52 Z" fill="#E06A4E"/>
+                <rect x="38" y="34" width="18" height="14" rx="3" fill="#3A2A1E"/>
+                <circle cx="47" cy="41" r="4" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Лайки и&nbsp;репосты</h3>
+            <p class="why-card__text">Снимайте, как ваши малыши играют и&nbsp;дурачатся, выкладывайте в&nbsp;соцсети и&nbsp;собирайте реакции. Такой контент любят все.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== СРАВНЕНИЕ ЦЕН ==================== -->
+    <section id="prices" class="section">
+      <div class="container">
+        <h2 class="section__title">Наша цена vs&nbsp;офлайн-магазин</h2>
+        <p class="section__lead">Мы&nbsp;продаём напрямую, поэтому цена ниже, чем на&nbsp;полке в&nbsp;офлайне.</p>
+
+        <div class="price-wrap">
+          <table class="price-table" id="price-table">
+            <thead>
+              <tr>
+                <th scope="col">Позиция</th>
+                <th scope="col">Наша цена</th>
+                <th scope="col">В&nbsp;офлайне</th>
+                <th scope="col">Экономия</th>
+              </tr>
+            </thead>
+            <tbody id="price-body">
+              <!-- Строки наполняет JS из массива PRICES -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Приписку легко убрать одной строкой, когда цены подтвердят. TODO: подтвердить цены -->
+        <p class="price-note" id="price-note">Цены указаны для&nbsp;примера, актуальные&nbsp;— уточняйте в&nbsp;мессенджере.</p>
+      </div>
+    </section>
+
+    <!-- ==================== ДОВЕРИЕ / МАТЕРИАЛЫ ==================== -->
+    <section id="about" class="section section--tint">
+      <div class="container about">
+        <h2 class="section__title">Натуральные материалы&nbsp;— это&nbsp;не&nbsp;просто слова</h2>
+        <p class="about__text">Мы&nbsp;выбираем безопасные для&nbsp;животных материалы: натуральный джут, хлопок, дерево и&nbsp;нетоксичные красители. Ничего, что&nbsp;навредит котику, если он&nbsp;решит попробовать игрушку на&nbsp;зуб. Прочная сборка держит активную игру и&nbsp;не&nbsp;лохматится за&nbsp;неделю.</p>
+      </div>
+    </section>
+
+    <!-- ==================== КОНТАКТЫ / ФИНАЛЬНЫЙ CTA ==================== -->
+    <section id="contacts" class="section section--cta">
+      <div class="container">
+        <h2 class="section__title">Напишите нам&nbsp;— подберём игрушку</h2>
+        <p class="section__lead">Ответим в&nbsp;мессенджере, поможем с&nbsp;выбором и&nbsp;расскажем про&nbsp;наличие.</p>
+
+        <div class="cta-row cta-row--big">
+          <a class="btn btn--wa" data-contact="whatsapp"
+             href="https://wa.me/79161234567"
+             target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a class="btn btn--tg" data-contact="telegram"
+             href="https://t.me/hulimyao" target="_blank" rel="noopener noreferrer">Telegram</a>
+          <a class="btn btn--ghost" data-contact="phone" href="tel:+79161234567">Позвонить</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== ФУТЕР ==================== -->
+  <footer class="footer">
+    <div class="container">
+      <p class="footer__brand">Хулимяо</p>
+      <p class="footer__contacts">
+        <a data-contact="phone" href="tel:+79161234567">+7&nbsp;916&nbsp;123-45-67</a>
+        <a data-contact="whatsapp" href="https://wa.me/79161234567" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a data-contact="telegram" href="https://t.me/hulimyao" target="_blank" rel="noopener noreferrer">Telegram</a>
+      </p>
+      <p class="footer__copy"><span id="footer-year">2026</span> Хулимяо. Натуральные игрушки для&nbsp;кошек.</p>
+      <p class="footer__sign">made by Pupa za Lupa</p>
+    </div>
+  </footer>
+
+  <!-- Мобильная липкая кнопка мессенджера (только на touch/узких экранах через CSS) -->
+  <a class="fab" data-contact="whatsapp"
+     href="https://wa.me/79161234567"
+     target="_blank" rel="noopener noreferrer" aria-label="Написать в WhatsApp">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="26" height="26">
+      <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 1 1 12 20Zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.1 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.4.1-.7.3-.9.9-.9 2.2-.9 2.3.1 1.5 1.1 2.9 2.5 4a9 9 0 0 0 3.6 1.6c1.7.3 2.2 0 2.6-.2.4-.2 1.1-.9 1.2-1.3.1-.4.1-.7 0-.8l-.5-.3Z"/>
+    </svg>
+  </a>
+
+  <!-- ==================== СЛОЙ КУРСОРА-ФИШКИ (декоративный) ==================== -->
+  <div id="laser-dot" aria-hidden="true"></div>
+  <div id="cat" aria-hidden="true">
+    <svg class="cat-svg" viewBox="0 0 120 120" width="52" height="52" aria-hidden="true" focusable="false">
+      <!-- хвост -->
+      <path class="cat-tail" d="M96 84 q26 -6 20 -34" stroke="#F5892E" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <!-- задние/передние лапки -->
+      <ellipse class="cat-paw cat-paw--l" cx="46" cy="104" rx="9" ry="6" fill="#F5892E"/>
+      <ellipse class="cat-paw cat-paw--r" cx="74" cy="104" rx="9" ry="6" fill="#F5892E"/>
+      <!-- тело -->
+      <ellipse cx="60" cy="86" rx="30" ry="24" fill="#F5892E"/>
+      <ellipse cx="60" cy="92" rx="18" ry="15" fill="#FFE7D1"/>
+      <!-- уши -->
+      <path d="M30 52 L24 26 L50 44 Z" fill="#F5892E"/>
+      <path d="M90 52 L96 26 L70 44 Z" fill="#F5892E"/>
+      <path d="M33 49 L30 34 L46 45 Z" fill="#FFC79A"/>
+      <path d="M87 49 L90 34 L74 45 Z" fill="#FFC79A"/>
+      <!-- голова -->
+      <circle cx="60" cy="58" r="30" fill="#F5892E"/>
+      <ellipse cx="60" cy="66" rx="20" ry="15" fill="#FFE7D1"/>
+      <!-- глаза -->
+      <circle class="cat-eye cat-eye--l" cx="50" cy="55" r="4" fill="#3A2A1E"/>
+      <circle class="cat-eye cat-eye--r" cx="70" cy="55" r="4" fill="#3A2A1E"/>
+      <!-- нос -->
+      <path d="M56 63 L64 63 L60 68 Z" fill="#E06A4E"/>
+      <!-- усы -->
+      <g stroke="#3A2A1E" stroke-width="2" stroke-linecap="round">
+        <line x1="34" y1="63" x2="48" y2="64"/>
+        <line x1="86" y1="63" x2="72" y2="64"/>
+      </g>
+    </svg>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
