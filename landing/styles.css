@@ -18,7 +18,17 @@
   --radius: 16px;
   --shadow: 0 8px 24px rgba(58, 42, 30, 0.10);
   --max: 1080px;
-  --font: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Commissioner", -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Логотип «Хулимяо» — самохостим Overdoze Sans (файл предоставит заказчик,
+   лежит в assets/fonts/overdoze-sans.woff2). Пока файла нет — сработает
+   кириллический фолбэк из .logo-word, название останется жирным и читаемым. */
+@font-face {
+  font-family: "Overdoze Sans";
+  src: url("assets/fonts/overdoze-sans.woff2") format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -28,6 +38,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   font-family: var(--font);
+  font-weight: 200;              /* Commissioner ExtraLight — база */
   color: var(--text);
   background: var(--bg);
   line-height: 1.55;
@@ -88,43 +99,30 @@ p { text-wrap: pretty; }
   gap: 6px;
   margin-bottom: 20px;
 }
-.logo-mark { display: block; }
-/* Логотип «ХУЛИМЯО» — массивные объёмные буквы в стиле Battletoads.
-   Шрифт Baloo 2 (800) с полной кириллицей + фолбэк Arial Black (тоже
-   жирный), чтобы без веб-шрифта лого не разваливалось. */
+/* Знак-кот над названием — главный визуал бренда, крупнее прежнего. */
+.logo-mark { display: block; width: 112px; height: 112px; }
+
+/* Логотип «ХУЛИМЯО» — чистый фирменный оранжевый + мягкая тень.
+   Шрифт Overdoze Sans (самохостинг), крепкий кириллический фолбэк:
+   Commissioner / Arial Black с весом 800 — без веб-шрифта название
+   остаётся жирным и читаемым. */
 .logo-word {
-  font-family: "Baloo 2", "Arial Black", "Segoe UI", sans-serif;
+  font-family: "Overdoze Sans", "Commissioner", "Arial Black", sans-serif;
   font-size: clamp(2.8rem, 8vw, 5rem);
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: .02em;
+  letter-spacing: .01em;
   line-height: 1;
   margin: 0;
+  /* Чистый оранжевый — без градиент-клипа и многослойной экструзии. */
   color: var(--brand);
-  /* Тёмная обводка (paint-order — чтобы обводка была под заливкой). */
-  -webkit-text-stroke: 2px var(--brand-dark);
+  /* Тонкая тёмная обводка ради читаемости на кремовом hero (1px, не «объём»). */
+  -webkit-text-stroke: 1px var(--brand-dark);
   paint-order: stroke fill;
-  /* Объём: лесенка тёмных теней вниз-вбок = экструзия 3D. */
+  /* Одна-две мягкие тени: лёгкая опора снизу + деликатное размытие. */
   text-shadow:
-    1px 1px 0 var(--brand-dark),
-    2px 2px 0 var(--brand-dark),
-    3px 3px 0 #322217,
-    4px 4px 0 #322217,
-    5px 5px 0 #2a1d13,
-    6px 6px 0 #2a1d13,
-    7px 7px 0 #221710,
-    8px 8px 0 #221710,
-    9px 11px 16px rgba(0, 0, 0, .35);
-}
-/* Блик сверху + заливка градиентом лица букв. Под @supports, чтобы при
-   отсутствии background-clip:text текст оставался залит --brand (не пропал). */
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .logo-word {
-    background: linear-gradient(180deg, var(--cream) 0%, #FFC178 32%, var(--brand) 62%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+    0 2px 0 #D9722340,
+    0 6px 14px rgba(58, 42, 30, .28);
 }
 
 .hero__lead {
@@ -575,4 +573,6 @@ body.cursor-fx .fab.laser-hot {
   .cta-row { flex-direction: column; align-items: stretch; }
   .cta-row .btn { width: 100%; }
   .hero__usp li { width: 100%; text-align: center; }
+  /* Знак-кот чуть меньше на мобиле. */
+  .logo-mark { width: 92px; height: 92px; }
 }

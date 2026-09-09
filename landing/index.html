@@ -8,8 +8,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Google Fonts с обязательным фолбэком в CSS. Если не загрузятся — вёрстка не ломается.
-       Baloo 2 (800) — жирный округлый bubble-шрифт с полной кириллицей для логотипа. -->
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+       Commissioner — основной текст сайта: база ExtraLight (200), плюс
+       400/600/700/800 для кнопок, заголовков, бейджей и фолбэка логотипа
+       (иерархия; 800 уже используется в стилях — грузим настоящий вес, а не
+       фейк-болд). Полная кириллица.
+       Шрифт логотипа (Overdoze Sans) самохостится через @font-face в styles.css. -->
+  <link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@200;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,35 +22,88 @@
   <header class="hero" id="top">
     <div class="container">
 
-      <!-- Логотип: мордочка (SVG) над названием, по центру, вверху -->
+      <!-- Логотип: знак-кот (SVG) над названием, по центру, вверху.
+           Серо-белый пушистый длинношёрстный кот по мотивам фото:
+           зелёные глаза, розовый нос, язычок, пушистый хвост. -->
       <a class="logo" href="#top" aria-label="Хулимяо, на главную">
         <svg class="logo-mark" viewBox="0 0 120 120" role="img"
-             aria-label="Хулимяо — игрушки для кошек" width="72" height="72">
-          <!-- уши -->
-          <path d="M28 46 L20 14 L52 34 Z" fill="#F5892E"/>
-          <path d="M92 46 L100 14 L68 34 Z" fill="#F5892E"/>
-          <path d="M31 42 L26 24 L46 36 Z" fill="#FFC79A"/>
-          <path d="M89 42 L94 24 L74 36 Z" fill="#FFC79A"/>
-          <!-- голова -->
-          <circle cx="60" cy="66" r="40" fill="#F5892E"/>
-          <!-- светлая мордочка -->
-          <ellipse cx="60" cy="78" rx="26" ry="20" fill="#FFE7D1"/>
-          <!-- глаза (довольные, прищур) -->
-          <path d="M42 66 q6 -8 12 0" stroke="#3A2A1E" stroke-width="4"
-                fill="none" stroke-linecap="round"/>
-          <path d="M66 66 q6 -8 12 0" stroke="#3A2A1E" stroke-width="4"
-                fill="none" stroke-linecap="round"/>
-          <!-- нос -->
-          <path d="M56 76 L64 76 L60 82 Z" fill="#E06A4E"/>
-          <!-- рот (довольный) -->
-          <path d="M60 82 q-6 8 -12 4 M60 82 q6 8 12 4" stroke="#3A2A1E"
-                stroke-width="3" fill="none" stroke-linecap="round"/>
+             aria-label="Хулимяо — игрушки для кошек" width="112" height="112">
+          <!-- ПУШИСТЫЙ ХВОСТ (за телом, слева), рваный мех по контуру -->
+          <path d="M30 92
+                   C6 90 2 66 14 54
+                   C20 48 27 47 30 52
+                   C24 56 21 66 25 74
+                   C28 80 34 82 40 80
+                   C40 88 36 92 30 92 Z"
+                fill="#8A8F96" stroke="#2B2B30" stroke-width="2"
+                stroke-linejoin="round"/>
+          <path d="M15 60 l-6 -3 M13 68 l-7 -1 M16 76 l-6 3 M22 84 l-4 5"
+                stroke="#8A8F96" stroke-width="4" stroke-linecap="round"/>
+
+          <!-- ТЕЛО: пушистый серый корпус с рваным мехом + белая грудь/живот -->
+          <path d="M40 108
+                   C24 108 20 92 26 80
+                   C22 78 20 70 26 64
+                   C34 55 52 54 64 60
+                   C80 58 96 62 98 78
+                   C100 90 96 104 84 108 Z"
+                fill="#8A8F96" stroke="#2B2B30" stroke-width="2"
+                stroke-linejoin="round"/>
+          <!-- белая грудь/живот -->
+          <path d="M46 106 C40 96 44 82 56 80 C70 78 82 86 82 98
+                   C82 104 78 108 72 108 Z"
+                fill="#F5F5F7" stroke="#2B2B30" stroke-width="1.5"
+                stroke-linejoin="round"/>
+          <!-- табби-полоски на корпусе -->
+          <path d="M34 74 q3 8 1 16 M90 76 q2 8 -1 15"
+                stroke="#5C6169" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- белые лапки с розовыми подушечками -->
+          <ellipse cx="52" cy="106" rx="8" ry="5" fill="#F5F5F7" stroke="#2B2B30" stroke-width="1.5"/>
+          <ellipse cx="74" cy="106" rx="8" ry="5" fill="#F5F5F7" stroke="#2B2B30" stroke-width="1.5"/>
+          <ellipse cx="52" cy="107" rx="2.4" ry="1.6" fill="#F0A9B8"/>
+          <ellipse cx="74" cy="107" rx="2.4" ry="1.6" fill="#F0A9B8"/>
+
+          <!-- ГОЛОВА -->
+          <!-- уши с розоватой внутренностью + мех -->
+          <path d="M40 44 L34 18 L58 34 Z" fill="#8A8F96" stroke="#2B2B30" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M80 44 L86 18 L62 34 Z" fill="#8A8F96" stroke="#2B2B30" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M42 40 L39 26 L53 35 Z" fill="#F0A9B8"/>
+          <path d="M78 40 L81 26 L67 35 Z" fill="#F0A9B8"/>
+          <!-- пушистая серая голова с рваным мехом -->
+          <path d="M60 30
+                   C44 30 32 42 32 56
+                   C32 72 44 82 60 82
+                   C76 82 88 72 88 56
+                   C88 42 76 30 60 30 Z"
+                fill="#8A8F96" stroke="#2B2B30" stroke-width="2"
+                stroke-linejoin="round"/>
+          <!-- табби-полоски на лбу -->
+          <path d="M54 34 l-2 9 M60 33 l0 10 M66 34 l2 9"
+                stroke="#5C6169" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- белая пушистая мордочка -->
+          <ellipse cx="60" cy="62" rx="22" ry="17" fill="#F5F5F7" stroke="#2B2B30" stroke-width="1.5"/>
+          <!-- зелёные глаза -->
+          <g>
+            <ellipse cx="50" cy="52" rx="6.5" ry="8" fill="#6FB84A"/>
+            <ellipse cx="70" cy="52" rx="6.5" ry="8" fill="#6FB84A"/>
+            <ellipse cx="50" cy="53" rx="2.6" ry="4.4" fill="#1E2226"/>
+            <ellipse cx="70" cy="53" rx="2.6" ry="4.4" fill="#1E2226"/>
+            <circle cx="52" cy="49" r="1.6" fill="#FFFFFF"/>
+            <circle cx="72" cy="49" r="1.6" fill="#FFFFFF"/>
+          </g>
+          <!-- розовый нос -->
+          <path d="M55 62 L65 62 L60 68 Z" fill="#EF7D97" stroke="#2B2B30" stroke-width="1.2" stroke-linejoin="round"/>
+          <!-- ротик + высунутый язычок -->
+          <path d="M60 68 q-5 5 -9 3 M60 68 q5 5 9 3"
+                stroke="#2B2B30" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M56 72 q4 8 8 0 Z" fill="#EF7D97" stroke="#2B2B30" stroke-width="1.2" stroke-linejoin="round"/>
+          <line x1="60" y1="72" x2="60" y2="76" stroke="#D75E7C" stroke-width="1.2"/>
           <!-- усы -->
-          <g stroke="#3A2A1E" stroke-width="2.5" stroke-linecap="round">
-            <line x1="30" y1="76" x2="48" y2="78"/>
-            <line x1="30" y1="84" x2="48" y2="84"/>
-            <line x1="90" y1="76" x2="72" y2="78"/>
-            <line x1="90" y1="84" x2="72" y2="84"/>
+          <g stroke="#2B2B30" stroke-width="1.6" stroke-linecap="round">
+            <line x1="40" y1="60" x2="52" y2="61"/>
+            <line x1="40" y1="66" x2="52" y2="65"/>
+            <line x1="80" y1="60" x2="68" y2="61"/>
+            <line x1="80" y1="66" x2="68" y2="65"/>
           </g>
         </svg>
         <!-- Визуально капсом делает text-transform в CSS; в DOM — обычный
