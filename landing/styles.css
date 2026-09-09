@@ -110,7 +110,15 @@ p { text-wrap: pretty; }
    остаётся жирным и читаемым. */
 .logo-word {
   font-family: "Overdoze Sans", "Commissioner", "Arial Black", sans-serif;
-  font-size: clamp(3.4rem, 10vw, 6.5rem);
+  /* ~2× крупнее по десктопу (макс 13rem = 2× прежних 6.5rem; полный кап
+     достигается к ~1387px, т.е. на 1440px «ХУЛИМЯО» уже 13rem). Узкие экраны
+     не крупнее прежнего: на 320px min 3.2rem=51.2px < прежних 54.4px; на 360px
+     15vw=54px ≈ прежний эффективный размер (54.4px), который не переполнял. */
+  font-size: clamp(3.2rem, 15vw, 13rem);
+  /* Страховка: «ХУЛИМЯО» — один неразрывный токен без line-height-переносов;
+     overflow-wrap не даёт ему вызвать горизонтальный скролл даже при широком
+     display-шрифте — в крайнем случае перенесётся, а не вылезет за край. */
+  overflow-wrap: anywhere;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .01em;
@@ -447,6 +455,8 @@ body.cursor-fx #cat { display: block; }
 #cat.cat--running .cat-leg  { animation: leg-swing .34s linear infinite; }
 #cat.cat--running .cat-leg--fr,
 #cat.cat--running .cat-leg--bl { animation-delay: -.17s; }
+/* Большие глаза моргают и в беге (реже, чем шаг лап). */
+#cat.cat--running .cat-eye  { animation: eye-blink 2.4s ease-in-out infinite; }
 @keyframes leg-swing {
   0%   { rotate: 22deg; }
   50%  { rotate: -22deg; }
@@ -503,7 +513,7 @@ body.cursor-fx #cat { display: block; }
 /* --- Состояние: сидит довольный — лапы накрыли точку + idle-петля --- */
 #cat.cat--sitting .cat-body { animation: sit-breathe 3.6s ease-in-out infinite; }
 #cat.cat--sitting .cat-tail { animation: sit-tail 2.6s ease-in-out infinite; }
-#cat.cat--sitting .cat-eye  { animation: sit-blink 3.6s ease-in-out infinite; }
+#cat.cat--sitting .cat-eye  { animation: eye-blink 3.6s ease-in-out infinite; }
 /* передние лапы сведены поверх точки, задние подобраны */
 #cat.cat--sitting .cat-leg--fl { transform: rotate(-26deg) translateY(3px); }
 #cat.cat--sitting .cat-leg--fr { transform: rotate(-34deg) translateY(3px); }
@@ -520,10 +530,14 @@ body.cursor-fx #cat { display: block; }
   45%      { rotate: -5deg; }
   60%      { rotate: 0deg; }
 }
-@keyframes sit-blink {
-  0%, 92%, 100% { scale: 1 1; }
-  95%           { scale: 1 .1; }
-  98%           { scale: 1 1; }
+/* Большие глаза моргают: почти всё время открыты, изредка короткое
+   схлопывание века через scaleY (transform-origin центр глаза, fill-box).
+   Радужка+зрачок+блик сгруппированы в .cat-eye и моргают вместе.
+   Общий кейфрейм для бега и покоя — разница только в длительности. */
+@keyframes eye-blink {
+  0%, 90%, 100% { scale: 1 1; }
+  93%           { scale: 1 .1; }
+  96%           { scale: 1 1; }
 }
 
 /* Точка чуть крупнее над кликабельным (класс вешает JS). */
