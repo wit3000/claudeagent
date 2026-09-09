@@ -1,10 +1,13 @@
 # Шрифты логотипа
 
-TODO: положить сюда `overdoze-sans.woff2` (файл предоставляет заказчик).
+Файл на месте: `overdozesans.otf` (Overdoze Sans, кириллица есть, все буквы
+«ХУЛИМЯО» покрываются). TODO снят.
 
 Логотип «Хулимяо» подключает Overdoze Sans через `@font-face` в
-`landing/styles.css` (самохостинг, путь `assets/fonts/overdoze-sans.woff2`).
+`landing/styles.css` (самохостинг, путь `assets/fonts/overdozesans.otf`,
+формат `opentype`).
 
-Пока файла нет, срабатывает кириллический фолбэк из `.logo-word`
-(`"Commissioner", "Arial Black", sans-serif`, вес 800) — название остаётся
-жирным и читаемым. **Не выпускать лендинг в прод, пока файла нет.**
+Кириллический фолбэк из `.logo-word`
+(`"Commissioner", "Arial Black", sans-serif`, вес 800) остаётся как
+страховка — если веб-шрифт не загрузится, название останется жирным и
+читаемым.
