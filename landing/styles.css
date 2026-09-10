@@ -58,7 +58,12 @@
   --transition-fast: 160ms ease-out;
 
   --max: 1080px;
-  --font: "Commissioner", -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Основной текст — Onest (мягкий санс, полная кириллица). */
+  --font: "Onest", -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Заголовки — Cormorant Garamond (тонкий сериф). Фолбэк Playfair Display /
+     Georgia тоже серифный и кириллический — при сбое загрузки заголовки
+     остаются серифными и читаемыми по-русски. */
+  --font-head: "Cormorant Garamond", "Playfair Display", Georgia, serif;
 }
 
 /* Логотип «Хулимяо» — самохостим Overdoze Sans (файл на месте:
@@ -78,7 +83,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   font-family: var(--font);
-  font-weight: 200;              /* Commissioner ExtraLight — база */
+  font-weight: 400;              /* Onest Regular — база */
   color: var(--text);
   background: var(--bg);
   line-height: 1.55;
@@ -117,10 +122,11 @@ p { text-wrap: pretty; }
 .section { padding: var(--space-7) 0; }
 .section--tint { background: var(--bg-tint); }
 .section__title {
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
-  font-weight: 800;
+  font-family: var(--font-head);
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   text-align: center;
   margin: 0 0 var(--space-3);
   color: var(--brand-dark);
@@ -156,10 +162,10 @@ p { text-wrap: pretty; }
 
 /* Логотип «ХУЛИМЯО» — чистый фирменный оранжевый + мягкая тень.
    Шрифт Overdoze Sans (самохостинг), крепкий кириллический фолбэк:
-   Commissioner / Arial Black с весом 800 — без веб-шрифта название
-   остаётся жирным и читаемым. */
+   Onest (веб-шрифт, есть 700) / Arial Black с весом 800 — без основного
+   шрифта название остаётся жирным и читаемым по-русски. */
 .logo-word {
-  font-family: "Overdoze Sans", "Commissioner", "Arial Black", sans-serif;
+  font-family: "Overdoze Sans", "Onest", "Arial Black", sans-serif;
   /* ~2× крупнее по десктопу (макс 13rem = 2× прежних 6.5rem; полный кап
      достигается к ~1387px, т.е. на 1440px «ХУЛИМЯО» уже 13rem). Узкие экраны
      не крупнее прежнего: на 320px min 3.2rem=51.2px < прежних 54.4px; на 360px
@@ -190,8 +196,10 @@ p { text-wrap: pretty; }
 }
 
 .hero__lead {
-  font-size: clamp(1.1rem, 2.6vw, 1.5rem);
-  font-weight: 700;
+  font-family: var(--font-head);
+  font-size: clamp(1.25rem, 2.8vw, 1.7rem);
+  font-weight: 600;
+  letter-spacing: .04em;
   color: var(--brand-dark);
   max-width: 720px;
   margin: 0 auto var(--space-5);
@@ -304,7 +312,7 @@ p { text-wrap: pretty; }
   justify-content: center;
 }
 .card__media svg { width: 48px; height: 48px; }
-.card__title { margin: 0 0 var(--space-2); font-size: 1.15rem; color: var(--brand-dark); }
+.card__title { font-family: var(--font-head); font-weight: 600; margin: 0 0 var(--space-2); font-size: 1.5rem; line-height: 1.2; color: var(--brand-dark); }
 .card__text { margin: 0; color: var(--muted); font-size: .95rem; }
 
 /* ============================================================
@@ -328,7 +336,7 @@ p { text-wrap: pretty; }
   height: 72px;
   margin: 0 auto var(--space-4);
 }
-.why-card__title { font-size: 1.25rem; color: var(--brand-dark); margin: 0 0 var(--space-2); }
+.why-card__title { font-family: var(--font-head); font-weight: 600; font-size: 1.6rem; line-height: 1.2; color: var(--brand-dark); margin: 0 0 var(--space-2); }
 .why-card__text { margin: 0; color: var(--muted); }
 
 /* ============================================================
@@ -356,13 +364,13 @@ p { text-wrap: pretty; }
   font-weight: 700;
 }
 .price-table tbody tr:last-child td { border-bottom: none; }
-.price-table .col-ours { font-weight: 800; color: var(--brand-dark); }
+.price-table .col-ours { font-weight: 700; color: var(--brand-dark); }
 .price-table .col-offline { color: var(--muted); text-decoration: line-through; }
 .price-badge {
   display: inline-block;
   background: var(--success-bg);
   color: var(--success-ink);
-  font-weight: 800;
+  font-weight: 700;
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
   font-size: .9rem;
@@ -398,7 +406,7 @@ p { text-wrap: pretty; }
   padding: var(--space-7) 0 var(--space-5);
   text-align: center;
 }
-.footer__brand { font-size: 1.5rem; font-weight: 800; color: var(--brand); margin: 0 0 var(--space-3); }
+.footer__brand { font-size: 1.5rem; font-weight: 700; color: var(--brand); margin: 0 0 var(--space-3); }
 .footer__contacts {
   display: flex;
   justify-content: center;
