@@ -352,15 +352,76 @@
       window.matchMedia("(hover: hover)").matches;
     if (!canHover) return;
 
+    // При reduced-motion переходы слайдов выключены медиазапросом
+    // (transition:none), поэтому событие transitionend не приходит и сброс
+    // через gallery--no-anim не нужен — используем только таймаут-страховку и
+    // прямое переключение классов, экономя лишний reflow.
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     var current = 0;      // индекс активного слайда
     var delayTimer = null; // таймер стартовой задержки
     var intervalTimer = null; // таймер авто-смены
+    var leaveTimer = null; // страховочный таймер очистки уходящего слайда
+    var leavingEl = null;  // текущий уходящий слайд (уезжает влево)
+
+    // Страховка на случай, если transitionend не придёт (фоновая вкладка,
+    // reduced-motion). Основной триггер очистки — событие transitionend;
+    // таймаут лишь гарантирует уборку, поэтому берётся с запасом над переходом
+    // CSS (.8s) и заведомо меньше интервала авто-смены (2с) — наложений нет.
+    var LEAVE_FALLBACK_MS = 1200;
+
+    // Возвращаем уходящий слайд в дефолт «справа» (снимаем .slide--leaving).
+    // Обе крайние позиции имеют opacity:0, поэтому «перескок» из -100% в +100%
+    // невиден. Вызывается по transitionend, по таймауту-страховке и в начале
+    // show() — идемпотентно.
+    function onLeaveEnd(e) {
+      // Реагируем только на завершение сдвига (transform), не на opacity.
+      if (e.propertyName === "transform") clearLeaving();
+    }
+    function clearLeaving() {
+      if (leaveTimer !== null) { clearTimeout(leaveTimer); leaveTimer = null; }
+      if (leavingEl) {
+        leavingEl.removeEventListener("transitionend", onLeaveEnd);
+        leavingEl.classList.remove("slide--leaving");
+        leavingEl = null;
+      }
+    }
 
     function show(i) {
       if (i === current) return;
-      slides[current].classList.remove("slide--active");
-      slides[i].classList.add("slide--active");
+      // Прежний уходящий (если ещё не очищен) — вернуть в дефолт до нового ухода.
+      clearLeaving();
+      var prev = slides[current];
+      prev.classList.remove("slide--active");
+      prev.classList.add("slide--leaving"); // уезжает влево, под активным
+      leavingEl = prev;
+      prev.addEventListener("transitionend", onLeaveEnd);
+      slides[i].classList.add("slide--active"); // въезжает справа, поверх
       current = i;
+      leaveTimer = setTimeout(clearLeaving, LEAVE_FALLBACK_MS);
+    }
+
+    // Мгновенный сброс к первому слайду без анимации: на миг гасим transition
+    // классом gallery--no-anim, выставляем состояния разом (первый — активный,
+    // остальные — дефолт «справа»), затем возвращаем анимацию. Так возврат по
+    // mouseleave чистый — без затяжной «неправильной» анимации и без вспышки.
+    function resetToFirst() {
+      clearLeaving();
+      // При reduced-motion transition уже none — гасить/форсить reflow незачем.
+      var snap = !reduceMotion;
+      if (snap) gallery.classList.add("gallery--no-anim");
+      for (var k = 0; k < N; k++) {
+        slides[k].classList.remove("slide--active", "slide--leaving");
+      }
+      slides[0].classList.add("slide--active");
+      current = 0;
+      if (snap) {
+        // Форсируем reflow, чтобы состояние без анимации применилось до возврата
+        // transition — иначе браузер «схлопнет» изменения и анимация всё же пойдёт.
+        void gallery.offsetWidth;
+        gallery.classList.remove("gallery--no-anim");
+      }
     }
 
     // Снимаем и таймер задержки, и интервал — без «залипших» таймеров.
@@ -386,7 +447,7 @@
 
     function onLeave() {
       stop();
-      show(0); // возврат к первому слайду для предсказуемости
+      resetToFirst(); // мгновенный чистый возврат к первому слайду
     }
 
     gallery.addEventListener("mouseenter", onEnter);

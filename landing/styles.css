@@ -244,7 +244,10 @@ p { text-wrap: pretty; }
   box-shadow: var(--shadow-md);
 }
 /* Слайды наложены друг на друга и заполняют контейнер; object-fit: cover
-   вписывает фото под контейнер без искажения пропорций. */
+   вписывает фото под контейнер без искажения пропорций.
+   Горизонтальный слайд «справа налево»: по умолчанию слайд «припаркован»
+   за правым краем (translateX(100%)); активный въезжает к центру; уходящий
+   уезжает за левый край. overflow:hidden у .hero__gallery держит их в рамке. */
 .hero__gallery .slide {
   position: absolute;
   inset: 0;
@@ -252,10 +255,29 @@ p { text-wrap: pretty; }
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity .6s ease;
+  transform: translateX(100%);
+  z-index: 1;
+  transition: transform .8s cubic-bezier(.22, .61, .36, 1),
+              opacity .8s cubic-bezier(.22, .61, .36, 1);
 }
-/* Активный слайд ставит JS переключением класса .slide--active. */
-.hero__gallery .slide--active { opacity: 1; }
+/* Активный слайд (JS ставит .slide--active) — в центре, поверх уходящего. */
+.hero__gallery .slide--active {
+  opacity: 1;
+  transform: translateX(0);
+  z-index: 2;
+}
+/* Уходящий слайд (JS ставит .slide--leaving) — уезжает за левый край, под
+   активным. Обе крайние позиции имеют opacity:0, поэтому возврат уходящего
+   в дефолт «справа» (снятие класса) происходит незаметно. */
+.hero__gallery .slide--leaving {
+  opacity: 0;
+  transform: translateX(-100%);
+  z-index: 1;
+}
+/* Мгновенный сброс без анимации (возврат к первому слайду по mouseleave):
+   JS на миг вешает этот класс на галерею, выставляет состояния разом и
+   снимает класс — так нет затяжной «неправильной» анимации и вспышки. */
+.hero__gallery.gallery--no-anim .slide { transition: none; }
 
 /* ============================================================
    КНОПКИ
@@ -680,9 +702,9 @@ body.cursor-fx .why-card.tile-hot {
   .btn,
   .fab,
   .footer__contacts a { transition: none; }
-  /* Кроссфейд фотогалереи — мгновенный (без плавности). Авто-смена по
-     наведению остаётся (это не «болезненная» анимация): слайды просто
-     переключаются скачком. Логика авто-смены в script.js. */
+  /* Горизонтальный слайд фотогалереи — мгновенный (без сдвига/плавности).
+     Авто-смена по наведению остаётся (это не «болезненная» анимация): слайды
+     переключаются скачком без анимации transform/opacity. Логика в script.js. */
   .hero__gallery .slide { transition: none; }
   /* Подсветка кнопок без резкого scale/перехода — оставляем только свечение. */
   body.cursor-fx .btn.laser-hot,
