@@ -148,7 +148,8 @@
     var facingLeft = false;
     var visible = true;
     var rafId = null;
-    var hotEl = null; // текущий подсвеченный лазером элемент (a/button)
+    var hotEl = null; // текущий кликабельный под лазером (a/button) — laser-hot
+    var hotTile = null; // текущая текстовая плитка под лазером — tile-hot
 
     function setClass(name, on) {
       cat.classList.toggle(name, on);
@@ -249,6 +250,7 @@
       dot.style.visibility = "hidden";
       cat.style.visibility = "hidden";
       setHot(null); // курсор ушёл за окно — снимаем подсветку кнопки
+      setHotTile(null); // и подсветку плитки
     }
     function onEnter(e) {
       visible = true;
@@ -261,8 +263,13 @@
       ensureLoop();
     }
 
-    // Над кликабельным: точка крупнее + сама кнопка/ссылка подсвечивается.
-    // hotEl хранит текущий подсвеченный элемент; вешаем/снимаем класс на нём.
+    // Селектор текстовых плиток без ссылок. Пилюли .hero__usp li оставлены за
+    // бортом: они узкие и стоят вплотную рядами — деликатный подъём читался бы
+    // на них неровно; подсвечиваем только крупные карточки .card/.why-card.
+    var TILE_SEL = ".card,.why-card";
+
+    // Над кликабельным (a/button): точка крупнее + «лазерная» подсветка кнопки
+    // (laser-hot). hotEl хранит текущий кликабельный; вешаем/снимаем класс.
     function setHot(el) {
       if (hotEl === el) return;
       if (hotEl) hotEl.classList.remove("laser-hot");
@@ -270,17 +277,42 @@
       if (hotEl) hotEl.classList.add("laser-hot");
       dot.classList.toggle("dot--hot", !!hotEl);
     }
+    // Над текстовой плиткой без ссылки: мягкая фирменная подсветка (tile-hot),
+    // БЕЗ красного ореола и БЕЗ увеличения точки (плитка некликабельна).
+    function setHotTile(el) {
+      if (hotTile === el) return;
+      if (hotTile) hotTile.classList.remove("tile-hot");
+      hotTile = el;
+      if (hotTile) hotTile.classList.add("tile-hot");
+    }
     function onOver(e) {
-      var t = e.target.closest && e.target.closest("a,button");
-      if (t) setHot(t);
+      if (!e.target.closest) return;
+      // Кликабельное имеет приоритет: если плитка содержит ссылку/кнопку —
+      // подсвечиваем «лазером», а не мягкой плиточной подсветкой.
+      var clickable = e.target.closest("a,button");
+      if (clickable) {
+        setHot(clickable);
+        setHotTile(null);
+        return;
+      }
+      var tile = e.target.closest(TILE_SEL);
+      if (tile) {
+        setHotTile(tile);
+        setHot(null);
+      }
     }
     function onOut(e) {
-      if (!e.target.closest || !e.target.closest("a,button")) return;
-      // Снимаем только если уходим не на другой кликабельный (onOver наведёт
-      // подсветку на новый элемент сам — без мигания).
+      if (!e.target.closest) return;
       var to = e.relatedTarget;
-      if (!to || !to.closest || !to.closest("a,button")) {
-        setHot(null);
+      // Кликабельное: снимаем, только если уходим не на другой кликабельный
+      // (onOver сам наведёт подсветку на новый — без мигания).
+      if (e.target.closest("a,button")) {
+        if (!to || !to.closest || !to.closest("a,button")) setHot(null);
+      }
+      // Плитка: снимаем, только если уходим не на другую плитку (без залипания
+      // и мигания при переходе между соседними карточками).
+      if (e.target.closest(TILE_SEL)) {
+        if (!to || !to.closest || !to.closest(TILE_SEL)) setHotTile(null);
       }
     }
 
@@ -342,6 +374,10 @@
       if (delayTimer !== null || intervalTimer !== null) return;
       delayTimer = setTimeout(function () {
         delayTimer = null;
+        // Первая смена — сразу по истечении задержки (≈2с), а не ещё через
+        // интервал: иначе первый переход был бы только на ~4с и казалось бы,
+        // что галерея не листает. Далее — каждые PHOTO_INTERVAL_MS по кругу.
+        show((current + 1) % N);
         intervalTimer = setInterval(function () {
           show((current + 1) % N);
         }, CONFIG.PHOTO_INTERVAL_MS);

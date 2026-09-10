@@ -649,6 +649,20 @@ body.cursor-fx .fab.laser-hot {
   transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
 }
 
+/* Мягкая подсветка текстовой плитки под лазером (класс вешает JS на .card/
+   .why-card). Отдельно от кнопочной laser-hot: деликатное свечение в фирменной
+   гамме (--brand) + лёгкий подъём, БЕЗ красного ореола и без увеличения точки —
+   плитка некликабельна, поэтому не должна читаться как кнопка. */
+body.cursor-fx .card.tile-hot,
+body.cursor-fx .why-card.tile-hot {
+  box-shadow:
+    0 0 0 1px rgba(245, 137, 46, .35),
+    0 8px 24px rgba(245, 137, 46, .22),
+    var(--shadow-lg);
+  transform: translateY(-2px);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
 /* ============================================================
    prefers-reduced-motion — глушим все @keyframes фишки и переходы
    ============================================================ */
@@ -673,6 +687,12 @@ body.cursor-fx .fab.laser-hot {
   /* Подсветка кнопок без резкого scale/перехода — оставляем только свечение. */
   body.cursor-fx .btn.laser-hot,
   body.cursor-fx .fab.laser-hot {
+    transform: none;
+    transition: none;
+  }
+  /* Плитки: без подъёма и резкого перехода — оставляем только мягкое свечение. */
+  body.cursor-fx .card.tile-hot,
+  body.cursor-fx .why-card.tile-hot {
     transform: none;
     transition: none;
   }
