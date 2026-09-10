@@ -17,7 +17,11 @@
     DOT_SIZE: 14,       // px (для справки; вид задаётся в CSS)
     CAT_SIZE: 60,       // px (для справки; вид задаётся в CSS)
     Z_INDEX: 9999,      // (для справки; z-index задаётся в CSS)
-    FLIP_DEADZONE: 2    // px, чтобы флип не дёргался у нуля
+    FLIP_DEADZONE: 2,   // px, чтобы флип не дёргался у нуля
+
+    // Фотокарусель в hero (автопролистывание по наведению):
+    PHOTO_HOVER_DELAY_MS: 2000, // задержка старта после наведения на галерею
+    PHOTO_INTERVAL_MS: 2000     // интервал смены слайдов после старта
   };
 
   /* ----------------------------------------------------------
@@ -296,6 +300,64 @@
   }
 
   /* ----------------------------------------------------------
+     ФОТОКАРУСЕЛЬ В HERO: автопролистывание по наведению
+     Слайды берём из DOM (пути к фото живут в HTML, в одном месте).
+     Слушатели вешаем на сам элемент галереи, а НЕ на document — чтобы не
+     конфликтовать с фишкой курсора (её слой pointer-events:none, ховер на
+     галерею срабатывает штатно).
+     ---------------------------------------------------------- */
+  function initPhotoCarousel() {
+    var gallery = document.querySelector(".hero__gallery");
+    if (!gallery) return;
+
+    var slides = gallery.querySelectorAll(".slide");
+    var N = slides.length;
+    if (N < 2) return; // нечего листать
+
+    // Ховер есть только при точном указателе. На тач/мобиле авто-смену не
+    // запускаем — виден статичный первый слайд (по аналогии с фишкой курсора).
+    var canHover = window.matchMedia &&
+      window.matchMedia("(hover: hover)").matches;
+    if (!canHover) return;
+
+    var current = 0;      // индекс активного слайда
+    var delayTimer = null; // таймер стартовой задержки
+    var intervalTimer = null; // таймер авто-смены
+
+    function show(i) {
+      if (i === current) return;
+      slides[current].classList.remove("slide--active");
+      slides[i].classList.add("slide--active");
+      current = i;
+    }
+
+    // Снимаем и таймер задержки, и интервал — без «залипших» таймеров.
+    function stop() {
+      if (delayTimer !== null) { clearTimeout(delayTimer); delayTimer = null; }
+      if (intervalTimer !== null) { clearInterval(intervalTimer); intervalTimer = null; }
+    }
+
+    function onEnter() {
+      // Повторные наведения не плодят несколько таймеров/интервалов.
+      if (delayTimer !== null || intervalTimer !== null) return;
+      delayTimer = setTimeout(function () {
+        delayTimer = null;
+        intervalTimer = setInterval(function () {
+          show((current + 1) % N);
+        }, CONFIG.PHOTO_INTERVAL_MS);
+      }, CONFIG.PHOTO_HOVER_DELAY_MS);
+    }
+
+    function onLeave() {
+      stop();
+      show(0); // возврат к первому слайду для предсказуемости
+    }
+
+    gallery.addEventListener("mouseenter", onEnter);
+    gallery.addEventListener("mouseleave", onLeave);
+  }
+
+  /* ----------------------------------------------------------
      СТАРТ
      ---------------------------------------------------------- */
   function init() {
@@ -303,6 +365,7 @@
     applyContacts();
     renderPrices();
     initCursorFx();
+    initPhotoCarousel();
   }
 
   if (document.readyState === "loading") {

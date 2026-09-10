@@ -227,7 +227,12 @@ p { text-wrap: pretty; }
   box-shadow: var(--shadow-sm);
 }
 
-.hero__visual {
+/* Фотогалерея-слайдер. Габариты/пропорции/скругление/рамка — как у прежнего
+   плейсхолдера. Штрих-фон остаётся подложкой: держит вид, пока фото не
+   загрузились (или при 404), поэтому блок не выглядит сломанным/пустым. */
+.hero__gallery {
+  position: relative;
+  overflow: hidden;
   margin: var(--space-6) auto 0;
   max-width: 760px;
   aspect-ratio: 16 / 8;
@@ -235,14 +240,20 @@ p { text-wrap: pretty; }
   background:
     repeating-linear-gradient(45deg, #FFE1C4 0 16px, #FFEAD6 16px 32px);
   border: 2px dashed var(--cream-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-weight: 700;
-  text-align: center;
 }
-.hero__visual small { font-weight: 600; opacity: .7; }
+/* Слайды наложены друг на друга и заполняют контейнер; object-fit: cover
+   обрезает фото под 16:8 без искажения пропорций (габариты фото не гарантированы). */
+.hero__gallery .slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .6s ease;
+}
+/* Активный слайд ставит JS переключением класса .slide--active. */
+.hero__gallery .slide--active { opacity: 1; }
 
 /* ============================================================
    КНОПКИ
@@ -653,6 +664,10 @@ body.cursor-fx .fab.laser-hot {
   .btn,
   .fab,
   .footer__contacts a { transition: none; }
+  /* Кроссфейд фотогалереи — мгновенный (без плавности). Авто-смена по
+     наведению остаётся (это не «болезненная» анимация): слайды просто
+     переключаются скачком. Логика авто-смены в script.js. */
+  .hero__gallery .slide { transition: none; }
   /* Подсветка кнопок без резкого scale/перехода — оставляем только свечение. */
   body.cursor-fx .btn.laser-hot,
   body.cursor-fx .fab.laser-hot {

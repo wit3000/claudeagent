@@ -49,9 +49,19 @@
         <a class="btn btn--ghost" data-contact="phone" href="tel:+79161234567">Позвонить</a>
       </div>
 
-      <!-- Визуал-плейсхолдер. TODO: заменить фото -->
-      <div class="hero__visual" role="img" aria-label="Фото игрушек Хулимяо (плейсхолдер)">
-        <span>Фото игрушек Хулимяо<br><small>TODO: заменить фото</small></span>
+      <!-- Фотогалерея игрушек. Штрих-фон-подложка (в styles.css) держит вид,
+           пока фото не загрузились или их ещё нет. Порядок показа 1→2→3→4.
+           Пути к фото живут только здесь (в src); JS берёт слайды из DOM.
+           TODO: загрузить assets/photos/photo-1..photo-4 (см. README в папке). -->
+      <div class="hero__gallery" role="group" aria-label="Фотогалерея игрушек Хулимяо">
+        <img class="slide slide--active" src="assets/photos/photo-1.jpg"
+             alt="Игрушка Хулимяо — фото 1" loading="lazy" decoding="async">
+        <img class="slide" src="assets/photos/photo-2.jpg"
+             alt="Игрушка Хулимяо — фото 2" loading="lazy" decoding="async">
+        <img class="slide" src="assets/photos/photo-3.jpg"
+             alt="Игрушка Хулимяо — фото 3" loading="lazy" decoding="async">
+        <img class="slide" src="assets/photos/photo-4.jpg"
+             alt="Игрушка Хулимяо — фото 4" loading="lazy" decoding="async">
       </div>
 
     </div>
