@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Хулимяо — натуральные игрушки для кошек</title>
+  <meta name="description" content="Хулимяо — игрушки для кошек из натуральных материалов: прочные, безопасные и дешевле, чем в магазине.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Google Fonts с обязательным фолбэком в CSS. Если не загрузятся — вёрстка не ломается.
+       Onest — основной текст сайта: 300/400/600/700 (база 400, акценты 600/700).
+       Cormorant Garamond — заголовки (тонкий изящный сериф): 500/600/700.
+       Оба сабсета включают кириллицу. Фолбэк заголовков (Playfair Display /
+       Georgia) задан в styles.css и тоже кириллический.
+       Шрифт логотипа (Overdoze Sans) самохостится через @font-face в styles.css. -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Onest:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ==================== HEADER / HERO ==================== -->
+  <header class="hero" id="top">
+    <div class="container">
+
+      <!-- Логотип: знак-кот (SVG) над названием, по центру, вверху.
+           Серо-белый пушистый длинношёрстный кот по мотивам фото:
+           зелёные глаза, розовый нос, язычок, пушистый хвост. -->
+      <a class="logo" href="#top" aria-label="Хулимяо, на главную">
+        <img class="logo-mark" src="assets/logo.png"
+             alt="Хулимяо — пушистый кот" width="240" height="240">
+        <!-- Визуально капсом делает text-transform в CSS; в DOM — обычный
+             регистр, чтобы скринридеры читали слово, а не по буквам. -->
+        <h1 class="logo-word">Хулимяо</h1>
+      </a>
+
+      <p class="hero__lead">Игрушки для&nbsp;котят всех возрастов</p>
+
+      <ul class="hero__usp" aria-label="Наши преимущества">
+        <li>Только натуральные и&nbsp;безопасные материалы</li>
+        <li>Прочные&nbsp;— не&nbsp;разгрызёт за&nbsp;неделю</li>
+        <li>Цена ниже, чем в&nbsp;магазине</li>
+      </ul>
+
+      <div class="cta-row">
+        <!-- Базовый href — рабочий фолбэк; JS добавит префилл-текст из CONTACTS. -->
+        <a class="btn btn--primary" data-contact="whatsapp"
+           href="https://wa.me/79161234567"
+           target="_blank" rel="noopener noreferrer">Написать в&nbsp;мессенджер</a>
+        <a class="btn btn--ghost" data-contact="phone" href="tel:+79161234567">Позвонить</a>
+      </div>
+
+      <!-- Фотогалерея игрушек. Нейтральный фон-заглушка (в styles.css) держит
+           вид, пока фото не загрузились. Порядок показа 1→2→3→4.
+           Пути к фото живут только здесь (в src); JS берёт слайды из DOM.
+           Первый слайд (above-the-fold, LCP) грузим eager, остальные lazy. -->
+      <div class="hero__gallery" role="group" aria-label="Фотогалерея игрушек Хулимяо">
+        <img class="slide slide--active" src="assets/photos/photo-1.jpg"
+             alt="Игрушка Хулимяо — фото 1" loading="eager" decoding="async">
+        <img class="slide" src="assets/photos/photo-2.jpg"
+             alt="Игрушка Хулимяо — фото 2" loading="lazy" decoding="async">
+        <img class="slide" src="assets/photos/photo-3.jpg"
+             alt="Игрушка Хулимяо — фото 3" loading="lazy" decoding="async">
+        <img class="slide" src="assets/photos/photo-4.jpg"
+             alt="Игрушка Хулимяо — фото 4" loading="lazy" decoding="async">
+      </div>
+
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ==================== КАТЕГОРИИ ==================== -->
+    <section id="categories" class="section">
+      <div class="container">
+        <h2 class="section__title">Что у&nbsp;нас есть</h2>
+        <p class="section__lead">Пять категорий игрушек&nbsp;— на&nbsp;любой характер и&nbsp;настроение котика.</p>
+
+        <div class="cards">
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Удочки-дразнилки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <!-- рукоять-удочка -->
+                <rect x="10" y="47" width="32" height="7" rx="3.5" fill="#3A2A1E" transform="rotate(-38 26 50.5)"/>
+                <!-- пёрышко -->
+                <path d="M43 32 C47 17 56 16 53 29 C51 35 46 35 43 32 Z" fill="#E8859A"/>
+                <!-- пушистый помпон -->
+                <circle cx="43" cy="33" r="9.5" fill="#F5892E"/>
+                <circle cx="39.5" cy="29.5" r="3.2" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Удочки-дразнилки</h3>
+            <p class="card__text">Активная игра вдвоём: перо, ленты и&nbsp;хвостики на&nbsp;прочной удочке.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Пирамидки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <!-- основание и штырёк -->
+                <rect x="14" y="50" width="36" height="8" rx="4" fill="#3A2A1E"/>
+                <rect x="30" y="16" width="4" height="36" rx="2" fill="#3A2A1E"/>
+                <!-- кольца снизу вверх -->
+                <rect x="16" y="42" width="32" height="9" rx="4.5" fill="#F5892E"/>
+                <rect x="20" y="33" width="24" height="9" rx="4.5" fill="#FFC79A"/>
+                <rect x="24" y="24" width="16" height="9" rx="4.5" fill="#F5892E"/>
+                <!-- шарик-макушка -->
+                <circle cx="32" cy="18" r="6" fill="#E8859A"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Пирамидки</h3>
+            <p class="card__text">Головоломки с&nbsp;шариками и&nbsp;треками&nbsp;— развивают ловкость.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Когтеточки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <!-- основание -->
+                <rect x="14" y="52" width="36" height="8" rx="4" fill="#3A2A1E"/>
+                <!-- столбик -->
+                <rect x="24" y="14" width="16" height="40" rx="6" fill="#FFC79A"/>
+                <!-- обмотка джутом -->
+                <rect x="24" y="18" width="16" height="4" rx="2" fill="#F5892E"/>
+                <rect x="24" y="27" width="16" height="4" rx="2" fill="#F5892E"/>
+                <rect x="24" y="36" width="16" height="4" rx="2" fill="#F5892E"/>
+                <rect x="24" y="45" width="16" height="4" rx="2" fill="#F5892E"/>
+                <!-- игрушка-шарик сверху -->
+                <circle cx="46" cy="16" r="5" fill="#E8859A"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Когтеточки</h3>
+            <p class="card__text">Спасают мебель: натуральный джут и&nbsp;устойчивое основание.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Мышки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <!-- хвост -->
+                <path d="M50 44 C60 44 60 30 52 30" fill="none" stroke="#F5892E" stroke-width="4" stroke-linecap="round"/>
+                <!-- тельце -->
+                <ellipse cx="34" cy="42" rx="20" ry="13" fill="#F5892E"/>
+                <!-- мордочка -->
+                <circle cx="18" cy="44" r="8" fill="#FFC79A"/>
+                <!-- ушко -->
+                <circle cx="30" cy="26" r="9" fill="#FFC79A"/>
+                <circle cx="30" cy="26" r="4.5" fill="#E8859A"/>
+                <!-- глаз и нос -->
+                <circle cx="24" cy="38" r="2.6" fill="#3A2A1E"/>
+                <circle cx="11" cy="44" r="2.6" fill="#E8859A"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Мышки</h3>
+            <p class="card__text">Лёгкие мышки для&nbsp;охоты&nbsp;— котик гоняет их&nbsp;по&nbsp;всей квартире.</p>
+          </article>
+
+          <article class="card">
+            <div class="card__media" role="img" aria-label="Автоматические игрушки (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <!-- линии движения слева и справа — диск в центре -->
+                <rect x="3" y="30" width="8" height="4.5" rx="2.25" fill="#FFC79A"/>
+                <rect x="4" y="38" width="6" height="4.5" rx="2.25" fill="#FFC79A"/>
+                <rect x="53" y="30" width="8" height="4.5" rx="2.25" fill="#FFC79A"/>
+                <rect x="54" y="38" width="6" height="4.5" rx="2.25" fill="#FFC79A"/>
+                <!-- самокатный диск с кнопкой -->
+                <circle cx="32" cy="34" r="16" fill="#F5892E"/>
+                <circle cx="32" cy="34" r="9.5" fill="#FFE7D1"/>
+                <circle cx="32" cy="34" r="4.5" fill="#E8859A"/>
+              </svg>
+            </div>
+            <h3 class="card__title">Автоматические игрушки</h3>
+            <p class="card__text">Двигаются сами и&nbsp;не&nbsp;дают заскучать, пока вас нет дома.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ПОЧЕМУ ХУЛИМЯО (УТП) ==================== -->
+    <section id="usp" class="section section--tint">
+      <div class="container">
+        <h2 class="section__title">Почему Хулимяо</h2>
+
+        <div class="why-cards">
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Щит с лапкой (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <path d="M32 6 L54 14 V32 C54 46 44 54 32 58 C20 54 10 46 10 32 V14 Z" fill="#F5892E"/>
+                <circle cx="32" cy="30" r="6" fill="#FFE7D1"/>
+                <circle cx="24" cy="22" r="3" fill="#FFE7D1"/>
+                <circle cx="32" cy="19" r="3" fill="#FFE7D1"/>
+                <circle cx="40" cy="22" r="3" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Любимая игрушка&nbsp;— на&nbsp;всю жизнь</h3>
+            <p class="why-card__text">Натуральные материалы и&nbsp;честная сборка: игрушка не&nbsp;разлохматится через неделю и&nbsp;останется любимой у&nbsp;вашего питомца на&nbsp;всю его жизнь.</p>
+          </article>
+
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Удочка и домик (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <line x1="8" y1="46" x2="30" y2="20" stroke="#3A2A1E" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="31" cy="18" r="5" fill="#E06A4E"/>
+                <path d="M40 50 V34 L52 26 L64 34 V50 Z" fill="#F5892E"/>
+                <rect x="48" y="40" width="8" height="10" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Весело вместе и&nbsp;врозь</h3>
+            <p class="why-card__text">Дразнилкой играть с&nbsp;котиком интересно вам обоим, а&nbsp;отдельные игрушки не&nbsp;дадут ему заскучать, пока вас нет дома.</p>
+          </article>
+
+          <article class="why-card">
+            <div class="why-card__icon" role="img" aria-label="Сердечко и камера (плейсхолдер)">
+              <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                <path d="M32 52 C12 38 12 22 24 22 C30 22 32 28 32 28 C32 28 34 22 40 22 C52 22 52 38 32 52 Z" fill="#E06A4E"/>
+                <rect x="38" y="34" width="18" height="14" rx="3" fill="#3A2A1E"/>
+                <circle cx="47" cy="41" r="4" fill="#FFE7D1"/>
+              </svg>
+            </div>
+            <h3 class="why-card__title">Лайки и&nbsp;репосты</h3>
+            <p class="why-card__text">Снимайте, как ваши малыши играют и&nbsp;дурачатся, выкладывайте в&nbsp;соцсети и&nbsp;собирайте реакции. Такой контент любят все.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== СРАВНЕНИЕ ЦЕН ==================== -->
+    <section id="prices" class="section">
+      <div class="container">
+        <h2 class="section__title">Наша цена vs&nbsp;магазин</h2>
+        <p class="section__lead">Мы&nbsp;продаём напрямую, поэтому цена ниже, чем на&nbsp;полке в&nbsp;магазине.</p>
+
+        <div class="price-wrap">
+          <table class="price-table" id="price-table">
+            <thead>
+              <tr>
+                <th scope="col">Позиция</th>
+                <th scope="col">Наша цена</th>
+                <th scope="col">В&nbsp;магазине</th>
+                <th scope="col">Экономия</th>
+              </tr>
+            </thead>
+            <tbody id="price-body">
+              <!-- Строки наполняет JS из массива PRICES -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Приписку легко убрать одной строкой, когда цены подтвердят. TODO: подтвердить цены -->
+        <p class="price-note" id="price-note">Цены указаны для&nbsp;примера, актуальные&nbsp;— уточняйте в&nbsp;мессенджере.</p>
+      </div>
+    </section>
+
+    <!-- ==================== ДОВЕРИЕ / МАТЕРИАЛЫ ==================== -->
+    <section id="about" class="section section--tint">
+      <div class="container about">
+        <h2 class="section__title">Натуральные материалы</h2>
+        <p class="about__text">Мы&nbsp;выбираем безопасные для&nbsp;животных материалы: натуральный джут, хлопок, дерево и&nbsp;нетоксичные красители. Ничего, что&nbsp;навредит котику, если он&nbsp;решит попробовать игрушку на&nbsp;зуб. Сшито и&nbsp;склеено на&nbsp;совесть: выдержит азартные догонялки и&nbsp;охоту, не&nbsp;расползётся и&nbsp;не&nbsp;облысеет через неделю.</p>
+      </div>
+    </section>
+
+    <!-- ==================== КОНТАКТЫ / ФИНАЛЬНЫЙ CTA ==================== -->
+    <section id="contacts" class="section section--cta">
+      <div class="container">
+        <h2 class="section__title">Напишите нам&nbsp;— подберём игрушку</h2>
+        <p class="section__lead">Ответим в&nbsp;мессенджере, поможем с&nbsp;выбором и&nbsp;расскажем про&nbsp;наличие.</p>
+
+        <div class="cta-row cta-row--big">
+          <a class="btn btn--wa" data-contact="whatsapp"
+             href="https://wa.me/79161234567"
+             target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a class="btn btn--tg" data-contact="telegram"
+             href="https://t.me/hulimyao" target="_blank" rel="noopener noreferrer">Telegram</a>
+          <a class="btn btn--ghost" data-contact="phone" href="tel:+79161234567">Позвонить</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== ФУТЕР ==================== -->
+  <footer class="footer">
+    <div class="container">
+      <p class="footer__brand">Хулимяо</p>
+      <p class="footer__contacts">
+        <a data-contact="phone" href="tel:+79161234567">+7&nbsp;916&nbsp;123-45-67</a>
+        <a data-contact="whatsapp" href="https://wa.me/79161234567" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a data-contact="telegram" href="https://t.me/hulimyao" target="_blank" rel="noopener noreferrer">Telegram</a>
+      </p>
+      <p class="footer__copy"><span id="footer-year">2026</span> Хулимяо. Натуральные игрушки для&nbsp;кошек.</p>
+      <p class="footer__sign">made by Pupa za Lupa</p>
+    </div>
+  </footer>
+
+  <!-- Мобильная липкая кнопка мессенджера (только на touch/узких экранах через CSS) -->
+  <a class="fab" data-contact="whatsapp"
+     href="https://wa.me/79161234567"
+     target="_blank" rel="noopener noreferrer" aria-label="Написать в WhatsApp">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="26" height="26">
+      <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 1 1 12 20Zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.5.1l-.7.9c-.1.2-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.1 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.4.1-.7.3-.9.9-.9 2.2-.9 2.3.1 1.5 1.1 2.9 2.5 4a9 9 0 0 0 3.6 1.6c1.7.3 2.2 0 2.6-.2.4-.2 1.1-.9 1.2-1.3.1-.4.1-.7 0-.8l-.5-.3Z"/>
+    </svg>
+  </a>
+
+  <!-- ==================== СЛОЙ КУРСОРА-ФИШКИ (декоративный) ==================== -->
+  <div id="laser-dot" aria-hidden="true"></div>
+  <div id="cat" aria-hidden="true">
+    <!-- Риггованный котёнок: части — отдельные группы с собственными
+         transform-origin (заданы в styles.css). Позу/движение частей задают
+         @keyframes по классам состояния; флип — на .cat-svg, чтобы не
+         конфликтовать с внутренними анимациями на .cat-rig. Котёнок по
+         умолчанию смотрит вправо. -->
+    <svg class="cat-svg" viewBox="0 0 120 120" width="60" height="60" aria-hidden="true" focusable="false">
+      <defs>
+        <!-- Мягкие тоновые градиенты: база + тень (+ блик) на каждую зону,
+             чтобы формы читались объёмными, а не плоскими примитивами. -->
+        <linearGradient id="catFurBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFB463"/>
+          <stop offset=".5" stop-color="#F5892E"/>
+          <stop offset="1" stop-color="#E06A1E"/>
+        </linearGradient>
+        <radialGradient id="catFurHead" cx=".4" cy=".34" r=".85">
+          <stop offset="0" stop-color="#FFC682"/>
+          <stop offset=".55" stop-color="#F5892E"/>
+          <stop offset="1" stop-color="#E06A1E"/>
+        </radialGradient>
+        <linearGradient id="catCream" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFF3E6"/>
+          <stop offset="1" stop-color="#F3CFAE"/>
+        </linearGradient>
+        <!-- Мордочка-«снаут»: почти плоский тон (низкий контраст), чтобы лицо
+             читалось фронтально-плоско, без выраженного 3D-рыла. -->
+        <linearGradient id="catSnout" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFF6EC"/>
+          <stop offset="1" stop-color="#FBE6D2"/>
+        </linearGradient>
+        <!-- Лапы: градиент в координатах viewBox (userSpaceOnUse) на всю длину
+             ноги, чтобы бедро и голень тонировались единой заливкой без шва
+             на колене (objectBoundingBox рестартовал бы градиент на каждом
+             сегменте). Меняется только по Y — X-позиция ноги роли не играет. -->
+        <linearGradient id="catLegNear" gradientUnits="userSpaceOnUse" x1="0" y1="82" x2="0" y2="111">
+          <stop offset="0" stop-color="#F5892E"/>
+          <stop offset="1" stop-color="#E06A1E"/>
+        </linearGradient>
+        <linearGradient id="catLegFar" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="109">
+          <stop offset="0" stop-color="#D9741F"/>
+          <stop offset="1" stop-color="#C85A2A"/>
+        </linearGradient>
+      </defs>
+
+      <g class="cat-rig">
+        <!-- ХВОСТ (за телом): 3 вложенных сегмента для хлыста с запаздыванием.
+             Каждый сегмент начинается в стыке предыдущего → при вращении
+             остаётся сцеплённым; вложенность даёт волну follow-through. -->
+        <g class="cat-tail">
+          <path d="M30 80 C24 77 19 69 18 62" fill="none" stroke="#E8781F"
+                stroke-width="11" stroke-linecap="round"/>
+          <g class="cat-tail2">
+            <path d="M18 62 C17 56 13 50 12 44" fill="none" stroke="#F5892E"
+                  stroke-width="9.5" stroke-linecap="round"/>
+            <path d="M17 58 l-6 -1 M15 50 l-6 -1" stroke="#C85A2A"
+                  stroke-width="3" stroke-linecap="round"/>
+            <g class="cat-tail3">
+              <path d="M12 44 C11 39 12 34 16 31" fill="none" stroke="#F5892E"
+                    stroke-width="8" stroke-linecap="round"/>
+              <path d="M16 31 C19 29 20 32 17 34" fill="#FFF3E6"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- ДАЛЬНИЕ ЛАПЫ (за телом): темнее, каждая — бедро + вложенная голень. -->
+        <g class="cat-leg cat-leg--br">
+          <rect x="31" y="80" width="10" height="16" rx="5" fill="url(#catLegFar)"/>
+          <g class="cat-shin">
+            <rect x="31" y="88" width="10" height="21" rx="5" fill="url(#catLegFar)"/>
+            <ellipse cx="36" cy="109" rx="6" ry="4" fill="#F3CFAE"/>
+          </g>
+        </g>
+        <g class="cat-leg cat-leg--fr">
+          <rect x="62" y="80" width="10" height="16" rx="5" fill="url(#catLegFar)"/>
+          <g class="cat-shin">
+            <rect x="62" y="88" width="10" height="21" rx="5" fill="url(#catLegFar)"/>
+            <ellipse cx="67" cy="109" rx="6" ry="4" fill="#F3CFAE"/>
+          </g>
+        </g>
+
+        <!-- ТЕЛО: плотный корпус (градиент), кремовый живот, полоски, блик. -->
+        <g class="cat-body">
+          <path d="M24 78 C20 60 34 50 54 50 C76 50 88 60 86 74
+                   C84 87 70 93 52 93 C36 93 27 90 24 78 Z"
+                fill="url(#catFurBody)" stroke="#C86A28" stroke-width="1.4"/>
+          <ellipse cx="56" cy="80" rx="23" ry="13" fill="url(#catCream)"/>
+          <path d="M42 53 q2 9 0 16 M54 51 q2 10 0 18 M66 52 q2 9 0 15"
+                stroke="#C85A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M34 60 q-6 6 -6 14" stroke="#FFC98A" stroke-width="3"
+                fill="none" stroke-linecap="round" opacity=".6"/>
+        </g>
+
+        <!-- БЛИЖНИЕ ЛАПЫ (перед телом): базовый тон, бедро + голень. -->
+        <g class="cat-leg cat-leg--bl">
+          <rect x="42" y="82" width="10" height="16" rx="5" fill="url(#catLegNear)"/>
+          <g class="cat-shin">
+            <rect x="42" y="90" width="10" height="21" rx="5" fill="url(#catLegNear)"/>
+            <ellipse cx="47" cy="111" rx="6" ry="4" fill="url(#catCream)"/>
+          </g>
+        </g>
+        <g class="cat-leg cat-leg--fl">
+          <rect x="74" y="82" width="10" height="16" rx="5" fill="url(#catLegNear)"/>
+          <g class="cat-shin">
+            <rect x="74" y="90" width="10" height="21" rx="5" fill="url(#catLegNear)"/>
+            <ellipse cx="79" cy="111" rx="6" ry="4" fill="url(#catCream)"/>
+          </g>
+        </g>
+
+        <!-- ГОЛОВА: уши×2, череп, плоская мордочка, мультяшные глаза, нос, усы. -->
+        <g class="cat-head">
+          <!-- уши — отдельные группы (independent jiggle) -->
+          <g class="cat-ear cat-ear--l">
+            <path d="M58 30 L61 10 L76 25 Z" fill="url(#catFurHead)"
+                  stroke="#C86A28" stroke-width="1.2"/>
+            <path d="M62 27 L64 16 L72 24 Z" fill="#F0A9B6"/>
+          </g>
+          <g class="cat-ear cat-ear--r">
+            <path d="M86 25 L100 9 L104 30 Z" fill="url(#catFurHead)"
+                  stroke="#C86A28" stroke-width="1.2"/>
+            <path d="M90 24 L99 15 L101 28 Z" fill="#F0A9B6"/>
+          </g>
+          <!-- череп -->
+          <circle cx="80" cy="44" r="25" fill="url(#catFurHead)"
+                  stroke="#C86A28" stroke-width="1.4"/>
+          <!-- «M»-полоски табби на лбу -->
+          <path d="M72 21 l3 11 M80 19 l0 12 M88 21 l-3 11"
+                stroke="#C85A2A" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+          <!-- полоски у щёк -->
+          <path d="M60 40 l-8 -3 M60 47 l-9 -1" stroke="#C85A2A"
+                stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M100 40 l8 -3 M100 47 l9 -1" stroke="#C85A2A"
+                stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- плоская кремовая мордочка (лёгкий тон, без выраженного объёма) -->
+          <ellipse cx="80" cy="57" rx="18.5" ry="12.5" fill="url(#catSnout)"/>
+          <!-- глаза «кота Тома»: крупный белый глаз-яблоко с тонким тёмным
+               контуром + средний чёрный зрачок + белый блик; вся группа
+               .cat-eye моргает вместе (белок+зрачок+блик) -->
+          <g class="cat-eye cat-eye--l">
+            <ellipse cx="71" cy="44" rx="8.6" ry="10.6" fill="#FFFFFF"
+                     stroke="#4A3120" stroke-width=".9"/>
+            <ellipse cx="71.6" cy="45" rx="3.6" ry="4.6" fill="#20180F"/>
+            <circle cx="70.2" cy="42.8" r="1.5" fill="#FFFFFF"/>
+          </g>
+          <g class="cat-eye cat-eye--r">
+            <ellipse cx="89" cy="44" rx="8.6" ry="10.6" fill="#FFFFFF"
+                     stroke="#4A3120" stroke-width=".9"/>
+            <ellipse cx="88.4" cy="45" rx="3.6" ry="4.6" fill="#20180F"/>
+            <circle cx="87.6" cy="42.8" r="1.5" fill="#FFFFFF"/>
+          </g>
+          <!-- нос — компактный, плоско посаженный -->
+          <path d="M75.5 59 L84.5 59 L80 63.5 Z" fill="#E8859A"
+                stroke="#DB6E86" stroke-width=".7"/>
+          <!-- улыбающийся рот -->
+          <path d="M80 63.5 q-5 5 -10 3 M80 63.5 q5 5 10 3"
+                stroke="#8A4A2A" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+          <!-- усы -->
+          <g stroke="#8A4A2A" stroke-width="1.8" stroke-linecap="round" opacity=".85">
+            <path d="M64 55 q-9 -1 -16 2"/>
+            <path d="M64 60 q-9 1 -16 3"/>
+            <path d="M96 55 q9 -1 16 2"/>
+            <path d="M96 60 q9 1 16 3"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

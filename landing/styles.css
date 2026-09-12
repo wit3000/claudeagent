@@ -1,0 +1,845 @@
+/* ============================================================
+   Хулимяо — стили лендинга
+   Вид, раскладка, адаптив и декларативные (@keyframes) анимации.
+   Координаты курсора/котёнка и переключение состояний — в script.js.
+   ============================================================ */
+
+:root {
+  /* --- Палитра: единый оранжево-кремовый бренд, один акцент (--brand) --- */
+  --brand: #F5892E;        /* рыжий бренда — единственный акцент */
+  --brand-dark: #3A2A1E;   /* тёмный текст / обводки */
+  --brand-nose: #E06A4E;
+  --cream: #FFE7D1;
+  --cream-2: #FFC79A;
+  /* Тёплый кремовый градиент-рамп для hero и финального CTA */
+  --cream-hi: #FFF7EF;
+  --cream-mid: #FFEBD8;
+  --cream-lo: #FFDCC0;
+  --bg: #FFFDFB;
+  --bg-tint: #FFF3E8;
+  --text: #2B2019;
+  --muted: #6B5D52;
+  --white: #ffffff;
+
+  /* --- Семантика: бейдж экономии + фирменные цвета мессенджеров --- */
+  --success-bg: #E9F9EE;
+  --success-ink: #147A3D;
+  --wa: #25D366;
+  --wa-ink: #06331B;
+  --tg: #2AABEE;
+  --tg-ink: #04283A;
+
+  /* --- Цвета футера (на тёмном --brand-dark) --- */
+  --footer-text: #F3E7DD;
+  --footer-muted: #C8B6A8;
+  --footer-faint: #7E6E62;
+
+  /* --- Шкала радиусов --- */
+  --radius-sm: 10px;
+  --radius-md: 16px;   /* карточки, таблица, hero-визуал */
+  --radius-pill: 999px;
+
+  /* --- Мягкие тени (тёмная непрозрачность ≤0.12, ≤2 слоёв) --- */
+  --shadow-sm: 0 2px 8px rgba(58, 42, 30, 0.08);
+  --shadow-md: 0 8px 24px rgba(58, 42, 30, 0.10);
+  --shadow-lg: 0 16px 40px rgba(58, 42, 30, 0.12);
+  --shadow: var(--shadow-md);   /* совместимость со старыми ссылками */
+
+  /* --- Шкала отступов 4/8/12/16/24/32/48 --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* --- Переходы: конкретные свойства (без transition: all) --- */
+  --transition-fast: 160ms ease-out;
+
+  --max: 1080px;
+  /* Основной текст — Onest (мягкий санс, полная кириллица). */
+  --font: "Onest", -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Заголовки — Cormorant Garamond (тонкий сериф). Фолбэк Playfair Display /
+     Georgia тоже серифный и кириллический — при сбое загрузки заголовки
+     остаются серифными и читаемыми по-русски. */
+  --font-head: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+}
+
+/* Логотип «Хулимяо» — самохостим Overdoze Sans (файл на месте:
+   assets/fonts/overdozesans.otf). Кириллический фолбэк из .logo-word
+   остаётся как страховка. */
+@font-face {
+  font-family: "Overdoze Sans";
+  src: url("assets/fonts/overdozesans.otf") format("opentype");
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-weight: 400;              /* Onest Regular — база */
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Скрываем нативный курсор только когда фича активна (класс ставит JS). */
+body.cursor-fx { cursor: none; }
+/* Внутри активной фичи интерактив тоже без системного курсора (котёнок рисует сам). */
+body.cursor-fx a,
+body.cursor-fx button { cursor: none; }
+
+img, svg { max-width: 100%; }
+
+a { color: inherit; }
+
+/* Видимый фокус с клавиатуры для всех ссылок; оранжевый читается и на кремовом,
+   и на тёмном фоне. Кнопки и футер уточняют цвет обводки ниже. */
+a:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.container {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+/* ---------- Типографика заголовков ---------- */
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+.section { padding: var(--space-7) 0; }
+.section--tint { background: var(--bg-tint); }
+.section__title {
+  font-family: var(--font-head);
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-align: center;
+  margin: 0 0 var(--space-3);
+  color: var(--brand-dark);
+}
+.section__lead {
+  text-align: center;
+  color: var(--muted);
+  max-width: 640px;
+  margin: 0 auto var(--space-6);
+}
+
+/* ============================================================
+   HERO / HEADER
+   ============================================================ */
+.hero {
+  background: linear-gradient(160deg, var(--cream-hi) 0%, var(--cream-mid) 100%);
+  padding: var(--space-7) 0;
+  text-align: center;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+/* Знак-кот над названием — главный визуал бренда. Картинка квадратная
+   (1254×1254), но кот лежит горизонтально — показываем по ширине, высота
+   авто, чтобы не искажать пропорции. */
+.logo-mark { display: block; width: clamp(160px, 40vw, 240px); height: auto; }
+
+/* Логотип «ХУЛИМЯО» — чистый фирменный оранжевый + мягкая тень.
+   Шрифт Overdoze Sans (самохостинг), крепкий кириллический фолбэк:
+   Onest (веб-шрифт, есть 700) / Arial Black с весом 800 — без основного
+   шрифта название остаётся жирным и читаемым по-русски. */
+.logo-word {
+  font-family: "Overdoze Sans", "Onest", "Arial Black", sans-serif;
+  /* ~2× крупнее по десктопу (макс 13rem = 2× прежних 6.5rem; полный кап
+     достигается к ~1387px, т.е. на 1440px «ХУЛИМЯО» уже 13rem). Узкие экраны
+     не крупнее прежнего: на 320px min 3.2rem=51.2px < прежних 54.4px; на 360px
+     15vw=54px ≈ прежний эффективный размер (54.4px), который не переполнял. */
+  font-size: clamp(3.2rem, 15vw, 13rem);
+  /* Страховка: «ХУЛИМЯО» — один неразрывный токен без line-height-переносов;
+     overflow-wrap не даёт ему вызвать горизонтальный скролл даже при широком
+     display-шрифте — в крайнем случае перенесётся, а не вылезет за край. */
+  overflow-wrap: anywhere;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .01em;
+  line-height: 1;
+  margin: 0;
+  /* Чистый оранжевый — без градиент-клипа. */
+  color: var(--brand);
+  /* Тонкая тёмная обводка ради читаемости на кремовом hero (1px, не «объём»). */
+  -webkit-text-stroke: 1px var(--brand-dark);
+  paint-order: stroke fill;
+  /* Деликатный «пряничный» объём: короткая экструзия в тёмно-оранжевой
+     гамме (не чёрной) + одна мягкая размытая опорная тень. */
+  text-shadow:
+    0 1px 0 #E0721E,
+    0 2px 0 #CC6519,
+    0 3px 0 #B85916,
+    0 4px 0 #A44E13,
+    0 8px 16px rgba(58, 42, 30, .24);
+}
+
+.hero__lead {
+  font-family: var(--font-head);
+  font-size: clamp(1.25rem, 2.8vw, 1.7rem);
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--brand-dark);
+  max-width: 720px;
+  margin: 0 auto var(--space-5);
+  text-transform: uppercase;
+}
+
+.hero__usp {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto var(--space-6);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-4);
+  max-width: 760px;
+}
+.hero__usp li {
+  background: var(--white);
+  border: 1px solid var(--cream-2);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--brand-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Фотогалерея-слайдер под реальные фото (1672×941 ≈ 16:9). Чистовой вид:
+   нейтральный фон-заглушка (--bg-tint) на время загрузки, скругление и мягкая
+   тень как у остальных блоков, overflow:hidden. Плейсхолдерные пунктирная
+   рамка и штрих-фон убраны — фото не должны выглядеть в «строительной» рамке.
+   aspect-ratio 16/9 подобран под пропорции загруженных фото, чтобы object-fit:
+   cover не срезал заметную часть кадра (прежнее 16/8 обрезало ~11% высоты). */
+.hero__gallery {
+  position: relative;
+  overflow: hidden;
+  margin: var(--space-6) auto 0;
+  max-width: 760px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  background: var(--bg-tint);
+  box-shadow: var(--shadow-md);
+}
+/* Слайды наложены друг на друга и заполняют контейнер; object-fit: cover
+   вписывает фото под контейнер без искажения пропорций.
+   Горизонтальный слайд «справа налево»: по умолчанию слайд «припаркован»
+   за правым краем (translateX(100%)); активный въезжает к центру; уходящий
+   уезжает за левый край. overflow:hidden у .hero__gallery держит их в рамке. */
+.hero__gallery .slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: translateX(100%);
+  z-index: 1;
+  transition: transform .8s cubic-bezier(.22, .61, .36, 1),
+              opacity .8s cubic-bezier(.22, .61, .36, 1);
+}
+/* Активный слайд (JS ставит .slide--active) — в центре, поверх уходящего. */
+.hero__gallery .slide--active {
+  opacity: 1;
+  transform: translateX(0);
+  z-index: 2;
+}
+/* Уходящий слайд (JS ставит .slide--leaving) — уезжает за левый край, под
+   активным. Обе крайние позиции имеют opacity:0, поэтому возврат уходящего
+   в дефолт «справа» (снятие класса) происходит незаметно. */
+.hero__gallery .slide--leaving {
+  opacity: 0;
+  transform: translateX(-100%);
+  z-index: 1;
+}
+/* Мгновенный сброс без анимации (возврат к первому слайду по mouseleave):
+   JS на миг вешает этот класс на галерею, выставляет состояния разом и
+   снимает класс — так нет затяжной «неправильной» анимации и вспышки. */
+.hero__gallery.gallery--no-anim .slide { transition: none; }
+
+/* ============================================================
+   КНОПКИ
+   ============================================================ */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+}
+.cta-row--big { margin-top: var(--space-2); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  border: 2px solid transparent;
+  transition: transform var(--transition-fast),
+              box-shadow var(--transition-fast),
+              background-color var(--transition-fast);
+}
+.btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.btn:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+.btn:focus-visible { outline: 3px solid var(--brand-dark); outline-offset: 2px; }
+
+.btn--primary { background: var(--brand); color: var(--white); }
+.btn--ghost {
+  background: var(--white);
+  color: var(--brand-dark);
+  border-color: var(--brand);
+}
+.btn--wa { background: var(--wa); color: var(--wa-ink); }
+.btn--tg { background: var(--tg); color: var(--tg-ink); }
+
+.cta-row--big .btn { min-width: 160px; }
+
+/* ============================================================
+   КАРТОЧКИ КАТЕГОРИЙ
+   ============================================================ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-5);
+}
+.card {
+  background: var(--white);
+  border: 1px solid var(--cream-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.card__media {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto var(--space-4);
+  border-radius: 50%;
+  background: var(--bg-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card__media svg { width: 48px; height: 48px; }
+.card__title { font-family: var(--font-head); font-weight: 600; margin: 0 0 var(--space-2); font-size: 1.5rem; line-height: 1.2; color: var(--brand-dark); }
+.card__text { margin: 0; color: var(--muted); font-size: .95rem; }
+
+/* ============================================================
+   ПОЧЕМУ ХУЛИМЯО (3 блока)
+   ============================================================ */
+.why-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+}
+.why-card {
+  background: var(--white);
+  border: 1px solid var(--cream-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.why-card__icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto var(--space-4);
+}
+.why-card__title { font-family: var(--font-head); font-weight: 600; font-size: 1.6rem; line-height: 1.2; color: var(--brand-dark); margin: 0 0 var(--space-2); }
+.why-card__text { margin: 0; color: var(--muted); }
+
+/* ============================================================
+   БЛОК ЦЕН
+   ============================================================ */
+.price-wrap { overflow-x: auto; }
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  min-width: 460px;
+}
+.price-table th,
+.price-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--bg-tint);
+}
+.price-table thead th {
+  background: var(--brand);
+  color: var(--white);
+  font-weight: 700;
+}
+.price-table tbody tr:last-child td { border-bottom: none; }
+.price-table .col-ours { font-weight: 700; color: var(--brand-dark); }
+.price-table .col-offline { color: var(--muted); text-decoration: line-through; }
+.price-badge {
+  display: inline-block;
+  background: var(--success-bg);
+  color: var(--success-ink);
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-size: .9rem;
+  white-space: nowrap;
+}
+.price-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: .9rem;
+  margin: var(--space-4) auto 0;
+  max-width: 560px;
+}
+
+/* ============================================================
+   ДОВЕРИЕ
+   ============================================================ */
+.about { max-width: 760px; text-align: center; }
+.about__text { color: var(--muted); font-size: 1.05rem; }
+
+/* ============================================================
+   ФИНАЛЬНЫЙ CTA
+   ============================================================ */
+.section--cta {
+  background: linear-gradient(160deg, var(--cream-mid) 0%, var(--cream-lo) 100%);
+}
+
+/* ============================================================
+   ФУТЕР
+   ============================================================ */
+.footer {
+  background: var(--brand-dark);
+  color: var(--footer-text);
+  padding: var(--space-7) 0 var(--space-5);
+  text-align: center;
+}
+.footer__brand { font-size: 1.5rem; font-weight: 700; color: var(--brand); margin: 0 0 var(--space-3); }
+.footer__contacts {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-3);
+}
+.footer__contacts a {
+  color: var(--footer-text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+.footer__contacts a:hover { color: var(--brand); text-decoration: underline; }
+.footer__copy { margin: 0 0 var(--space-4); color: var(--footer-muted); font-size: .9rem; }
+.footer__sign {
+  margin: 0;
+  color: var(--footer-faint);
+  font-size: .78rem;
+  letter-spacing: .02em;
+}
+
+/* ============================================================
+   ЛИПКАЯ КНОПКА (FAB) — только на узких экранах
+   ============================================================ */
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--wa);
+  color: var(--white);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-lg);
+  z-index: 900;
+  transition: transform var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+.fab:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.fab:active { transform: translateY(0); box-shadow: var(--shadow-md); }
+@media (max-width: 768px) {
+  .fab { display: flex; }
+}
+
+/* ============================================================
+   СЛОЙ КУРСОРА-ФИШКИ
+   Позиции пишет JS через transform: translate3d(). По умолчанию
+   элементы скрыты — JS показывает их, только когда фича активна.
+   ============================================================ */
+#laser-dot,
+#cat {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform;
+  display: none;               /* включает JS классом на body */
+  transform: translate3d(-100px, -100px, 0);
+}
+body.cursor-fx #laser-dot,
+body.cursor-fx #cat { display: block; }
+
+/* Лазерная точка */
+#laser-dot {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;        /* центрируем на координате */
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+              #fff 0%, #ff4d3d 35%, #d1170a 70%, rgba(209,23,10,0) 100%);
+  box-shadow: 0 0 8px 3px rgba(255, 61, 45, 0.75);
+  animation: dot-pulse 1.1s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 8px 3px rgba(255, 61, 45, 0.65); }
+  50%      { box-shadow: 0 0 14px 5px rgba(255, 61, 45, 0.95); }
+}
+/* Точка «поймана» котёнком в IDLE — притухает под лапами. */
+#laser-dot.dot--caught { opacity: 0; }
+
+/* Котёнок: центрируем спрайт (60px) на координате. */
+#cat {
+  margin: -30px 0 0 -30px;
+}
+/* overflow:visible — иначе корневой <svg> клипает всё за viewBox, и на прыжке
+   (риг уезжает вверх) кончики ушей и хвост срезаются по верху вьюпорта.
+   Контейнер #cat не клипает (у него нет overflow:hidden), центровка спрайта
+   на координате курсора не меняется. */
+.cat-svg { display: block; overflow: visible; }
+
+/* Точки вращения суставов рига. Урок пробы: transform-box:fill-box на <g> в
+   ряде браузеров даёт нулевой bbox → transform-origin в % не срабатывает.
+   Поэтому для ВСЕХ анимируемых частей берём transform-box:view-box и задаём
+   origin в координатах viewBox (0 0 120 120) прямо по каждому суставу —
+   надёжно и одинаково во всех браузерах. Вложенные группы (сегменты хвоста,
+   голень внутри лапы) при этом сохраняют сцепку: origin ребёнка лежит в стыке
+   родителя, и трансформ родителя переносит его вместе с сегментом. */
+.cat-rig,
+.cat-body,
+.cat-head,
+.cat-ear,
+.cat-tail,
+.cat-tail2,
+.cat-tail3,
+.cat-leg,
+.cat-shin,
+.cat-eye {
+  transform-box: view-box;
+}
+.cat-rig  { transform-origin: 60px 112px; } /* «пол» под котёнком */
+.cat-body { transform-origin: 54px 90px; }  /* низ корпуса */
+.cat-head { transform-origin: 78px 66px; }  /* шея у низа головы */
+.cat-ear--l { transform-origin: 63px 28px; }
+.cat-ear--r { transform-origin: 98px 27px; }
+/* Хвост — цепочка суставов: основание → середина → кончик. */
+.cat-tail  { transform-origin: 30px 80px; }
+.cat-tail2 { transform-origin: 18px 62px; }
+.cat-tail3 { transform-origin: 12px 44px; }
+/* Лапы: бедро вращается в тазобедренном суставе, голень — в колене. */
+.cat-leg--br { transform-origin: 36px 80px; }
+.cat-leg--br .cat-shin { transform-origin: 36px 93px; }
+.cat-leg--fr { transform-origin: 67px 80px; }
+.cat-leg--fr .cat-shin { transform-origin: 67px 93px; }
+.cat-leg--bl { transform-origin: 47px 82px; }
+.cat-leg--bl .cat-shin { transform-origin: 47px 95px; }
+.cat-leg--fl { transform-origin: 79px 82px; }
+.cat-leg--fl .cat-shin { transform-origin: 79px 95px; }
+/* Глаза мигают через scaleY — origin по центру каждого глаза. */
+.cat-eye--l  { transform-origin: 71px 44px; }
+.cat-eye--r  { transform-origin: 89px 44px; }
+
+/* Флип по направлению движения — на .cat-svg, чтобы не конфликтовал с
+   внутренними анимациями частей (класс вешает JS). */
+#cat.cat--flip .cat-svg { transform: scaleX(-1); }
+
+/* --- Состояние: бежит — беговой цикл с двухсегментными лапами --- */
+/* Диагональные пары лап в противофазе (fl+br против fr+bl): им сдвигаем фазу
+   на полцикла (-.16s от .32s) и по бедру, и по голени — сгиб в колене даёт
+   живой вынос-толчок-подбор вместо «палок». */
+#cat.cat--running .cat-rig  { animation: run-rig  .32s ease-in-out infinite; }
+#cat.cat--running .cat-body { animation: run-body .32s ease-in-out infinite; }
+#cat.cat--running .cat-head { animation: run-head .32s ease-in-out infinite; }
+#cat.cat--running .cat-ear--l { animation: run-ear .32s ease-in-out infinite; }
+#cat.cat--running .cat-ear--r { animation: run-ear .32s ease-in-out infinite; animation-delay: -.08s; }
+#cat.cat--running .cat-leg  { animation: run-thigh .32s ease-in-out infinite; }
+#cat.cat--running .cat-shin { animation: run-shin  .32s ease-in-out infinite; }
+#cat.cat--running .cat-leg--fl,
+#cat.cat--running .cat-leg--br { animation-delay: -.16s; }
+#cat.cat--running .cat-leg--fl .cat-shin,
+#cat.cat--running .cat-leg--br .cat-shin { animation-delay: -.16s; }
+/* Хвост-хлыст: волна по сегментам с нарастающей амплитудой и запаздыванием. */
+#cat.cat--running .cat-tail  { animation: run-tail1 .42s ease-in-out infinite; }
+#cat.cat--running .cat-tail2 { animation: run-tail2 .42s ease-in-out infinite; animation-delay: -.06s; }
+#cat.cat--running .cat-tail3 { animation: run-tail3 .42s ease-in-out infinite; animation-delay: -.12s; }
+/* В беге глаза не моргают — остаются открытыми. */
+@keyframes run-thigh {
+  0%   { transform: rotate(26deg); }   /* вынос вперёд */
+  25%  { transform: rotate(2deg); }    /* постановка */
+  50%  { transform: rotate(-24deg); }  /* толчок назад */
+  75%  { transform: rotate(-6deg); }   /* подбор */
+  100% { transform: rotate(26deg); }
+}
+@keyframes run-shin {
+  0%   { transform: rotate(-14deg); }  /* вытянута на выносе */
+  25%  { transform: rotate(0deg); }    /* прямая под опорой */
+  50%  { transform: rotate(6deg); }    /* дотянута на толчке */
+  68%  { transform: rotate(46deg); }   /* колено подтянуто на подборе */
+  85%  { transform: rotate(20deg); }
+  100% { transform: rotate(-14deg); }
+}
+@keyframes run-rig {
+  0%, 100% { transform: translateY(0) rotate(1deg); }   /* лёгкий наклон вперёд */
+  50%      { transform: translateY(-2.5px) rotate(1deg); }
+}
+@keyframes run-body {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  25%      { transform: translateY(-3px) scale(.98, 1.03); } /* stretch вверх */
+  50%      { transform: translateY(0) scale(1.03, .97); }    /* compress */
+  75%      { transform: translateY(-3px) scale(.98, 1.03); }
+}
+@keyframes run-head {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50%      { transform: rotate(2deg) translateY(-1.5px); }
+}
+@keyframes run-ear {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-7deg); }
+}
+@keyframes run-tail1 {
+  0%, 100% { transform: rotate(6deg); }
+  50%      { transform: rotate(-8deg); }
+}
+@keyframes run-tail2 {
+  0%, 100% { transform: rotate(10deg); }
+  50%      { transform: rotate(-15deg); }
+}
+@keyframes run-tail3 {
+  0%, 100% { transform: rotate(15deg); }
+  50%      { transform: rotate(-22deg); }
+}
+
+/* --- Состояние: прыжок — присед(anticip) → взлёт(stretch) → приземление(squash) --- */
+#cat.cat--jumping .cat-rig {
+  animation: cat-jump var(--jump-ms, 300ms) cubic-bezier(.3, 0, .4, 1) both;
+}
+#cat.cat--jumping .cat-head { animation: jump-head var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-leg--fl,
+#cat.cat--jumping .cat-leg--fr { animation: jump-thigh-front var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-leg--bl,
+#cat.cat--jumping .cat-leg--br { animation: jump-thigh-back var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-shin { animation: jump-shin var(--jump-ms, 300ms) ease-out both; }
+/* Хвост тянется следом — follow-through с лагом по сегментам. */
+#cat.cat--jumping .cat-tail  { animation: jump-tail1 var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-tail2 { animation: jump-tail2 var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-tail3 { animation: jump-tail3 var(--jump-ms, 300ms) ease-out both; }
+@keyframes cat-jump {
+  0%   { transform: translateY(3px) scale(1.12, .88); }  /* присед/замах — squash */
+  15%  { transform: translateY(5px) scale(1.14, .86); }  /* глубже присед */
+  55%  { transform: translateY(-24px) scale(.9, 1.12); } /* взлёт — stretch, пик дуги */
+  82%  { transform: translateY(-4px) scale(1.02, .98); } /* снижение */
+  90%  { transform: translateY(0) scale(1.08, .92); }    /* касание точки — squash */
+  100% { transform: translateY(0) scale(1, 1); }         /* осел ровно, без попа в sitting */
+}
+@keyframes jump-thigh-front {
+  0%   { transform: rotate(30deg); }   /* сгруппированы под телом */
+  15%  { transform: rotate(40deg); }
+  55%  { transform: rotate(-30deg); }  /* тянутся вперёд к точке */
+  100% { transform: rotate(-10deg); }  /* идут накрывать */
+}
+@keyframes jump-thigh-back {
+  0%   { transform: rotate(-26deg); }
+  15%  { transform: rotate(-38deg); }
+  55%  { transform: rotate(28deg); }   /* оттолкнулись, вытянуты назад */
+  100% { transform: rotate(6deg); }
+}
+@keyframes jump-shin {
+  0%   { transform: rotate(50deg); }   /* глубоко поджаты в приседе */
+  15%  { transform: rotate(58deg); }
+  55%  { transform: rotate(-10deg); }  /* распрямлены в полёте */
+  100% { transform: rotate(24deg); }   /* мягкий сгиб на приземлении */
+}
+@keyframes jump-head {
+  0%   { transform: rotate(6deg); }    /* смотрит вниз в приседе */
+  55%  { transform: rotate(-6deg); }   /* ведёт вверх по дуге */
+  100% { transform: rotate(0deg); }
+}
+@keyframes jump-tail1 {
+  0% { transform: rotate(-12deg); } 55% { transform: rotate(18deg); } 100% { transform: rotate(4deg); }
+}
+@keyframes jump-tail2 {
+  0% { transform: rotate(-16deg); } 60% { transform: rotate(26deg); } 100% { transform: rotate(6deg); }
+}
+@keyframes jump-tail3 {
+  0% { transform: rotate(-20deg); } 66% { transform: rotate(34deg); } 100% { transform: rotate(10deg); }
+}
+
+/* --- Состояние: сидит довольный — лапки накрыли точку + idle-петля --- */
+#cat.cat--sitting .cat-body { animation: sit-breathe 3.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-head { animation: sit-headbob 3.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-eye  { animation: eye-blink 4s ease-in-out infinite; }
+#cat.cat--sitting .cat-ear--r { animation: ear-twitch 5.5s ease-in-out infinite; }
+/* Кончик хвоста водит колечком (сегментированный сдвиг с лагом). */
+#cat.cat--sitting .cat-tail  { animation: sit-tail1 2.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-tail2 { animation: sit-tail2 2.8s ease-in-out infinite; animation-delay: -.15s; }
+#cat.cat--sitting .cat-tail3 { animation: sit-tail3 2.8s ease-in-out infinite; animation-delay: -.3s; }
+/* Передние лапки сведены поверх точки, задние подобраны (бедро + колено). */
+#cat.cat--sitting .cat-leg--fl { transform: rotate(-30deg); }
+#cat.cat--sitting .cat-leg--fr { transform: rotate(-24deg); }
+#cat.cat--sitting .cat-leg--fl .cat-shin { transform: rotate(70deg); }
+#cat.cat--sitting .cat-leg--fr .cat-shin { transform: rotate(76deg); }
+#cat.cat--sitting .cat-leg--bl { transform: rotate(10deg); }
+#cat.cat--sitting .cat-leg--br { transform: rotate(6deg); }
+#cat.cat--sitting .cat-leg--bl .cat-shin { transform: rotate(30deg); }
+#cat.cat--sitting .cat-leg--br .cat-shin { transform: rotate(26deg); }
+@keyframes sit-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50%      { transform: scale(1.015, 1.03); }
+}
+@keyframes sit-headbob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-1px) rotate(-1deg); }
+}
+@keyframes sit-tail1 {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-4deg); }
+}
+@keyframes sit-tail2 {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(8deg); }
+}
+@keyframes sit-tail3 {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(14deg); }
+  50%      { transform: rotate(-6deg); }
+  75%      { transform: rotate(10deg); }
+}
+@keyframes ear-twitch {
+  0%, 90%, 100% { transform: rotate(0deg); }
+  94%           { transform: rotate(-11deg); }
+  97%           { transform: rotate(-2deg); }
+}
+/* Большие глаза моргают: почти весь цикл открыты, изредка короткое схлопывание
+   века через scaleY (origin по центру глаза). Склера+тёмный глаз+блики
+   сгруппированы в .cat-eye и моргают вместе. Используется только в покое
+   (cat--sitting). */
+@keyframes eye-blink {
+  0%, 88% { transform: scaleY(1); }   /* большую часть цикла глаз открыт */
+  92%     { transform: scaleY(.06); } /* полностью закрылся */
+  97%     { transform: scaleY(.06); } /* держим закрытым ~120–180мс */
+  100%    { transform: scaleY(1); }   /* снова открыт */
+}
+
+/* Точка чуть крупнее над кликабельным (класс вешает JS). */
+#laser-dot.dot--hot { scale: 1.6; }
+
+/* Подсветка самой кнопки, на которую наведён лазер (класс вешает JS на любой
+   a/button, но заметный эффект — только для настоящих кнопок .btn/.fab, чтобы
+   inline-ссылки не получали прямоугольное свечение). Сильнее обычного :hover:
+   свечение в цвет лазера + подъём и scale. body.cursor-fx поднимает
+   специфичность выше .btn:hover, чтобы перебивала. */
+body.cursor-fx .btn.laser-hot,
+body.cursor-fx .fab.laser-hot {
+  box-shadow:
+    0 0 0 3px rgba(255, 61, 45, .5),
+    0 0 20px 6px rgba(255, 61, 45, .6),
+    var(--shadow);
+  transform: translateY(-2px) scale(1.05);
+  filter: brightness(1.06);
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+
+/* Мягкая подсветка текстовой плитки под лазером (класс вешает JS на .card/
+   .why-card). Отдельно от кнопочной laser-hot: деликатное свечение в фирменной
+   гамме (--brand) + лёгкий подъём, БЕЗ красного ореола и без увеличения точки —
+   плитка некликабельна, поэтому не должна читаться как кнопка. */
+body.cursor-fx .card.tile-hot,
+body.cursor-fx .why-card.tile-hot {
+  box-shadow:
+    0 0 0 1px rgba(245, 137, 46, .35),
+    0 8px 24px rgba(245, 137, 46, .22),
+    var(--shadow-lg);
+  transform: translateY(-2px);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+/* ============================================================
+   prefers-reduced-motion — глушим все @keyframes фишки и переходы
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  #laser-dot,
+  #cat .cat-rig,
+  #cat .cat-body,
+  #cat .cat-head,
+  #cat .cat-ear,
+  #cat .cat-tail,
+  #cat .cat-tail2,
+  #cat .cat-tail3,
+  #cat .cat-leg,
+  #cat .cat-shin,
+  #cat .cat-eye {
+    animation: none !important;
+  }
+  .btn,
+  .fab,
+  .footer__contacts a { transition: none; }
+  /* Горизонтальный слайд фотогалереи — мгновенный (без сдвига/плавности).
+     Авто-смена по наведению остаётся (это не «болезненная» анимация): слайды
+     переключаются скачком без анимации transform/opacity. Логика в script.js. */
+  .hero__gallery .slide { transition: none; }
+  /* Подсветка кнопок без резкого scale/перехода — оставляем только свечение. */
+  body.cursor-fx .btn.laser-hot,
+  body.cursor-fx .fab.laser-hot {
+    transform: none;
+    transition: none;
+  }
+  /* Плитки: без подъёма и резкого перехода — оставляем только мягкое свечение. */
+  body.cursor-fx .card.tile-hot,
+  body.cursor-fx .why-card.tile-hot {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ============================================================
+   АДАПТИВ
+   ============================================================ */
+@media (max-width: 900px) {
+  .why-cards { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+}
+@media (max-width: 480px) {
+  .section { padding: var(--space-6) 0; }
+  .cta-row { flex-direction: column; align-items: stretch; }
+  .cta-row .btn { width: 100%; }
+  .hero__usp li { width: 100%; text-align: center; }
+}
