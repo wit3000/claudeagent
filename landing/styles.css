@@ -533,123 +533,227 @@ body.cursor-fx #cat { display: block; }
 }
 .cat-svg { display: block; }
 
-/* Точки вращения частей рига. transform-box:fill-box → origin в % считается
-   от собственного bbox каждой части (предсказуемо в браузерах). */
+/* Точки вращения суставов рига. Урок пробы: transform-box:fill-box на <g> в
+   ряде браузеров даёт нулевой bbox → transform-origin в % не срабатывает.
+   Поэтому для ВСЕХ анимируемых частей берём transform-box:view-box и задаём
+   origin в координатах viewBox (0 0 120 120) прямо по каждому суставу —
+   надёжно и одинаково во всех браузерах. Вложенные группы (сегменты хвоста,
+   голень внутри лапы) при этом сохраняют сцепку: origin ребёнка лежит в стыке
+   родителя, и трансформ родителя переносит его вместе с сегментом. */
 .cat-rig,
 .cat-body,
 .cat-head,
+.cat-ear,
 .cat-tail,
-.cat-leg {
-  transform-box: fill-box;
+.cat-tail2,
+.cat-tail3,
+.cat-leg,
+.cat-shin,
+.cat-eye {
+  transform-box: view-box;
 }
-.cat-rig  { transform-origin: 50% 100%; }  /* приземистость от «пола» */
-.cat-body { transform-origin: 50% 100%; }
-.cat-head { transform-origin: 40% 100%; }  /* шея у низа головы */
-.cat-tail { transform-origin: 100% 100%; } /* основание хвоста у корпуса */
-.cat-leg  { transform-origin: 50% 0%; }    /* бедро/плечо — верх лапы */
-/* Глаза мигают через scaleY. transform-box:fill-box на <g> в ряде браузеров
-   даёт нулевой bbox → scale не срабатывает. Берём view-box + origin в
-   координатах viewBox (0 0 120 120) по центру каждого глаза — надёжно. */
-.cat-eye     { transform-box: view-box; }
-.cat-eye--l  { transform-origin: 65px 46px; }
-.cat-eye--r  { transform-origin: 83px 46px; }
+.cat-rig  { transform-origin: 60px 112px; } /* «пол» под котёнком */
+.cat-body { transform-origin: 54px 90px; }  /* низ корпуса */
+.cat-head { transform-origin: 78px 66px; }  /* шея у низа головы */
+.cat-ear--l { transform-origin: 63px 28px; }
+.cat-ear--r { transform-origin: 98px 27px; }
+/* Хвост — цепочка суставов: основание → середина → кончик. */
+.cat-tail  { transform-origin: 30px 80px; }
+.cat-tail2 { transform-origin: 18px 62px; }
+.cat-tail3 { transform-origin: 12px 44px; }
+/* Лапы: бедро вращается в тазобедренном суставе, голень — в колене. */
+.cat-leg--br { transform-origin: 36px 80px; }
+.cat-leg--br .cat-shin { transform-origin: 36px 93px; }
+.cat-leg--fr { transform-origin: 67px 80px; }
+.cat-leg--fr .cat-shin { transform-origin: 67px 93px; }
+.cat-leg--bl { transform-origin: 47px 82px; }
+.cat-leg--bl .cat-shin { transform-origin: 47px 95px; }
+.cat-leg--fl { transform-origin: 79px 82px; }
+.cat-leg--fl .cat-shin { transform-origin: 79px 95px; }
+/* Глаза мигают через scaleY — origin по центру каждого глаза. */
+.cat-eye--l  { transform-origin: 71px 44px; }
+.cat-eye--r  { transform-origin: 89px 44px; }
 
 /* Флип по направлению движения — на .cat-svg, чтобы не конфликтовал с
    внутренними анимациями частей (класс вешает JS). */
 #cat.cat--flip .cat-svg { transform: scaleX(-1); }
 
-/* --- Состояние: бежит — реальный шаговый цикл --- */
-/* Диагональные пары лап в противофазе (fl+br против fr+bl). */
-#cat.cat--running .cat-rig  { animation: run-body .34s ease-in-out infinite; }
-#cat.cat--running .cat-head { animation: run-head .34s ease-in-out infinite; }
-#cat.cat--running .cat-tail { animation: run-tail .5s ease-in-out infinite; }
-#cat.cat--running .cat-leg  { animation: leg-swing .34s linear infinite; }
-#cat.cat--running .cat-leg--fr,
-#cat.cat--running .cat-leg--bl { animation-delay: -.17s; }
+/* --- Состояние: бежит — беговой цикл с двухсегментными лапами --- */
+/* Диагональные пары лап в противофазе (fl+br против fr+bl): им сдвигаем фазу
+   на полцикла (-.16s от .32s) и по бедру, и по голени — сгиб в колене даёт
+   живой вынос-толчок-подбор вместо «палок». */
+#cat.cat--running .cat-rig  { animation: run-rig  .32s ease-in-out infinite; }
+#cat.cat--running .cat-body { animation: run-body .32s ease-in-out infinite; }
+#cat.cat--running .cat-head { animation: run-head .32s ease-in-out infinite; }
+#cat.cat--running .cat-ear--l { animation: run-ear .32s ease-in-out infinite; }
+#cat.cat--running .cat-ear--r { animation: run-ear .32s ease-in-out infinite; animation-delay: -.08s; }
+#cat.cat--running .cat-leg  { animation: run-thigh .32s ease-in-out infinite; }
+#cat.cat--running .cat-shin { animation: run-shin  .32s ease-in-out infinite; }
+#cat.cat--running .cat-leg--fl,
+#cat.cat--running .cat-leg--br { animation-delay: -.16s; }
+#cat.cat--running .cat-leg--fl .cat-shin,
+#cat.cat--running .cat-leg--br .cat-shin { animation-delay: -.16s; }
+/* Хвост-хлыст: волна по сегментам с нарастающей амплитудой и запаздыванием. */
+#cat.cat--running .cat-tail  { animation: run-tail1 .42s ease-in-out infinite; }
+#cat.cat--running .cat-tail2 { animation: run-tail2 .42s ease-in-out infinite; animation-delay: -.06s; }
+#cat.cat--running .cat-tail3 { animation: run-tail3 .42s ease-in-out infinite; animation-delay: -.12s; }
 /* Большие глаза моргают и в беге (реже, чем шаг лап). */
-#cat.cat--running .cat-eye  { animation: eye-blink 2.4s ease-in-out infinite; }
-@keyframes leg-swing {
-  0%   { rotate: 22deg; }
-  50%  { rotate: -22deg; }
-  100% { rotate: 22deg; }
+#cat.cat--running .cat-eye  { animation: eye-blink 2.6s ease-in-out infinite; }
+@keyframes run-thigh {
+  0%   { transform: rotate(26deg); }   /* вынос вперёд */
+  25%  { transform: rotate(2deg); }    /* постановка */
+  50%  { transform: rotate(-24deg); }  /* толчок назад */
+  75%  { transform: rotate(-6deg); }   /* подбор */
+  100% { transform: rotate(26deg); }
+}
+@keyframes run-shin {
+  0%   { transform: rotate(-14deg); }  /* вытянута на выносе */
+  25%  { transform: rotate(0deg); }    /* прямая под опорой */
+  50%  { transform: rotate(6deg); }    /* дотянута на толчке */
+  68%  { transform: rotate(46deg); }   /* колено подтянуто на подборе */
+  85%  { transform: rotate(20deg); }
+  100% { transform: rotate(-14deg); }
+}
+@keyframes run-rig {
+  0%, 100% { transform: translateY(0) rotate(1deg); }   /* лёгкий наклон вперёд */
+  50%      { transform: translateY(-2.5px) rotate(1deg); }
 }
 @keyframes run-body {
-  0%, 100% { translate: 0 0;    scale: 1 1; }
-  25%      { translate: 0 -4px; scale: .98 1.02; }
-  50%      { translate: 0 0;    scale: 1.02 .98; }
-  75%      { translate: 0 -4px; scale: .98 1.02; }
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  25%      { transform: translateY(-3px) scale(.98, 1.03); } /* stretch вверх */
+  50%      { transform: translateY(0) scale(1.03, .97); }    /* compress */
+  75%      { transform: translateY(-3px) scale(.98, 1.03); }
 }
 @keyframes run-head {
-  0%, 100% { rotate: -2deg; translate: 0 0; }
-  50%      { rotate: 2deg;  translate: 0 -2px; }
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50%      { transform: rotate(2deg) translateY(-1.5px); }
 }
-@keyframes run-tail {
-  0%, 100% { rotate: 9deg; }
-  50%      { rotate: -11deg; }
+@keyframes run-ear {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-7deg); }
+}
+@keyframes run-tail1 {
+  0%, 100% { transform: rotate(6deg); }
+  50%      { transform: rotate(-8deg); }
+}
+@keyframes run-tail2 {
+  0%, 100% { transform: rotate(10deg); }
+  50%      { transform: rotate(-15deg); }
+}
+@keyframes run-tail3 {
+  0%, 100% { transform: rotate(15deg); }
+  50%      { transform: rotate(-22deg); }
 }
 
-/* --- Состояние: прыжок — дуга с фазами: присед → взлёт(stretch) → приземление --- */
+/* --- Состояние: прыжок — присед(anticip) → взлёт(stretch) → приземление(squash) --- */
 #cat.cat--jumping .cat-rig {
   animation: cat-jump var(--jump-ms, 300ms) cubic-bezier(.3, 0, .4, 1) both;
 }
+#cat.cat--jumping .cat-head { animation: jump-head var(--jump-ms, 300ms) ease-out both; }
 #cat.cat--jumping .cat-leg--fl,
-#cat.cat--jumping .cat-leg--fr {
-  animation: jump-front var(--jump-ms, 300ms) ease-out both;
-}
+#cat.cat--jumping .cat-leg--fr { animation: jump-thigh-front var(--jump-ms, 300ms) ease-out both; }
 #cat.cat--jumping .cat-leg--bl,
-#cat.cat--jumping .cat-leg--br {
-  animation: jump-back var(--jump-ms, 300ms) ease-out both;
-}
+#cat.cat--jumping .cat-leg--br { animation: jump-thigh-back var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-shin { animation: jump-shin var(--jump-ms, 300ms) ease-out both; }
+/* Хвост тянется следом — follow-through с лагом по сегментам. */
+#cat.cat--jumping .cat-tail  { animation: jump-tail1 var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-tail2 { animation: jump-tail2 var(--jump-ms, 300ms) ease-out both; }
+#cat.cat--jumping .cat-tail3 { animation: jump-tail3 var(--jump-ms, 300ms) ease-out both; }
 @keyframes cat-jump {
-  0%   { translate: 0 3px;   scale: 1.12 .88; }  /* присед/замах — squash */
-  15%  { translate: 0 5px;   scale: 1.14 .86; }  /* глубже присед */
-  55%  { translate: 0 -24px; scale: .9 1.12; }   /* взлёт — stretch, пик дуги */
-  82%  { translate: 0 -4px;  scale: 1.02 .98; }  /* снижение */
-  90%  { translate: 0 0;     scale: 1.08 .92; }  /* касание точки — squash */
-  100% { translate: 0 0;     scale: 1 1; }       /* осел ровно, без попа в sitting */
+  0%   { transform: translateY(3px) scale(1.12, .88); }  /* присед/замах — squash */
+  15%  { transform: translateY(5px) scale(1.14, .86); }  /* глубже присед */
+  55%  { transform: translateY(-24px) scale(.9, 1.12); } /* взлёт — stretch, пик дуги */
+  82%  { transform: translateY(-4px) scale(1.02, .98); } /* снижение */
+  90%  { transform: translateY(0) scale(1.08, .92); }    /* касание точки — squash */
+  100% { transform: translateY(0) scale(1, 1); }         /* осел ровно, без попа в sitting */
 }
-@keyframes jump-front {
-  0%   { rotate: 26deg; }   /* лапы сгруппированы под телом */
-  15%  { rotate: 34deg; }
-  55%  { rotate: -28deg; }  /* вытянуты вперёд к точке */
-  100% { rotate: -12deg; }  /* идут накрывать */
+@keyframes jump-thigh-front {
+  0%   { transform: rotate(30deg); }   /* сгруппированы под телом */
+  15%  { transform: rotate(40deg); }
+  55%  { transform: rotate(-30deg); }  /* тянутся вперёд к точке */
+  100% { transform: rotate(-10deg); }  /* идут накрывать */
 }
-@keyframes jump-back {
-  0%   { rotate: -24deg; }
-  15%  { rotate: -34deg; }
-  55%  { rotate: 26deg; }   /* оттолкнулись, вытянуты назад на взлёте */
-  100% { rotate: 6deg; }
+@keyframes jump-thigh-back {
+  0%   { transform: rotate(-26deg); }
+  15%  { transform: rotate(-38deg); }
+  55%  { transform: rotate(28deg); }   /* оттолкнулись, вытянуты назад */
+  100% { transform: rotate(6deg); }
+}
+@keyframes jump-shin {
+  0%   { transform: rotate(50deg); }   /* глубоко поджаты в приседе */
+  15%  { transform: rotate(58deg); }
+  55%  { transform: rotate(-10deg); }  /* распрямлены в полёте */
+  100% { transform: rotate(24deg); }   /* мягкий сгиб на приземлении */
+}
+@keyframes jump-head {
+  0%   { transform: rotate(6deg); }    /* смотрит вниз в приседе */
+  55%  { transform: rotate(-6deg); }   /* ведёт вверх по дуге */
+  100% { transform: rotate(0deg); }
+}
+@keyframes jump-tail1 {
+  0% { transform: rotate(-12deg); } 55% { transform: rotate(18deg); } 100% { transform: rotate(4deg); }
+}
+@keyframes jump-tail2 {
+  0% { transform: rotate(-16deg); } 60% { transform: rotate(26deg); } 100% { transform: rotate(6deg); }
+}
+@keyframes jump-tail3 {
+  0% { transform: rotate(-20deg); } 66% { transform: rotate(34deg); } 100% { transform: rotate(10deg); }
 }
 
-/* --- Состояние: сидит довольный — лапы накрыли точку + idle-петля --- */
-#cat.cat--sitting .cat-body { animation: sit-breathe 3.6s ease-in-out infinite; }
-#cat.cat--sitting .cat-tail { animation: sit-tail 2.6s ease-in-out infinite; }
-#cat.cat--sitting .cat-eye  { animation: eye-blink 3.6s ease-in-out infinite; }
-/* передние лапы сведены поверх точки, задние подобраны */
-#cat.cat--sitting .cat-leg--fl { transform: rotate(-26deg) translateY(3px); }
-#cat.cat--sitting .cat-leg--fr { transform: rotate(-34deg) translateY(3px); }
-#cat.cat--sitting .cat-leg--bl { transform: rotate(8deg); }
-#cat.cat--sitting .cat-leg--br { transform: rotate(4deg); }
+/* --- Состояние: сидит довольный — лапки накрыли точку + idle-петля --- */
+#cat.cat--sitting .cat-body { animation: sit-breathe 3.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-head { animation: sit-headbob 3.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-eye  { animation: eye-blink 4s ease-in-out infinite; }
+#cat.cat--sitting .cat-ear--r { animation: ear-twitch 5.5s ease-in-out infinite; }
+/* Кончик хвоста водит колечком (сегментированный сдвиг с лагом). */
+#cat.cat--sitting .cat-tail  { animation: sit-tail1 2.8s ease-in-out infinite; }
+#cat.cat--sitting .cat-tail2 { animation: sit-tail2 2.8s ease-in-out infinite; animation-delay: -.15s; }
+#cat.cat--sitting .cat-tail3 { animation: sit-tail3 2.8s ease-in-out infinite; animation-delay: -.3s; }
+/* Передние лапки сведены поверх точки, задние подобраны (бедро + колено). */
+#cat.cat--sitting .cat-leg--fl { transform: rotate(-30deg); }
+#cat.cat--sitting .cat-leg--fr { transform: rotate(-24deg); }
+#cat.cat--sitting .cat-leg--fl .cat-shin { transform: rotate(70deg); }
+#cat.cat--sitting .cat-leg--fr .cat-shin { transform: rotate(76deg); }
+#cat.cat--sitting .cat-leg--bl { transform: rotate(10deg); }
+#cat.cat--sitting .cat-leg--br { transform: rotate(6deg); }
+#cat.cat--sitting .cat-leg--bl .cat-shin { transform: rotate(30deg); }
+#cat.cat--sitting .cat-leg--br .cat-shin { transform: rotate(26deg); }
 @keyframes sit-breathe {
-  0%, 100% { scale: 1 1; }
-  50%      { scale: 1.015 1.03; }
+  0%, 100% { transform: scale(1, 1); }
+  50%      { transform: scale(1.015, 1.03); }
 }
-@keyframes sit-tail {
-  0%, 100% { rotate: 0deg; }
-  15%      { rotate: -9deg; }
-  30%      { rotate: 3deg; }
-  45%      { rotate: -5deg; }
-  60%      { rotate: 0deg; }
+@keyframes sit-headbob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-1px) rotate(-1deg); }
 }
-/* Большие глаза моргают: почти всё время открыты, изредка короткое
-   схлопывание века через scaleY (transform-origin центр глаза, fill-box).
-   Радужка+зрачок+блик сгруппированы в .cat-eye и моргают вместе.
-   Общий кейфрейм для бега и покоя — разница только в длительности. */
+@keyframes sit-tail1 {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-4deg); }
+}
+@keyframes sit-tail2 {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(8deg); }
+}
+@keyframes sit-tail3 {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(14deg); }
+  50%      { transform: rotate(-6deg); }
+  75%      { transform: rotate(10deg); }
+}
+@keyframes ear-twitch {
+  0%, 90%, 100% { transform: rotate(0deg); }
+  94%           { transform: rotate(-11deg); }
+  97%           { transform: rotate(-2deg); }
+}
+/* Большие глаза моргают: почти весь цикл открыты, изредка короткое схлопывание
+   века через scaleY (origin по центру глаза). Радужка+зрачок+блики
+   сгруппированы в .cat-eye и моргают вместе. Общий кейфрейм для бега и покоя —
+   разница только в длительности. */
 @keyframes eye-blink {
-  0%, 88% { scale: 1 1; }   /* большую часть цикла глаз открыт */
-  92%     { scale: 1 .04; } /* полностью закрылся */
-  97%     { scale: 1 .04; } /* держим закрытым ~120–180мс — моргание читается глазом */
-  100%    { scale: 1 1; }   /* снова открыт */
+  0%, 88% { transform: scaleY(1); }   /* большую часть цикла глаз открыт */
+  92%     { transform: scaleY(.06); } /* полностью закрылся */
+  97%     { transform: scaleY(.06); } /* держим закрытым ~120–180мс */
+  100%    { transform: scaleY(1); }   /* снова открыт */
 }
 
 /* Точка чуть крупнее над кликабельным (класс вешает JS). */
@@ -694,8 +798,12 @@ body.cursor-fx .why-card.tile-hot {
   #cat .cat-rig,
   #cat .cat-body,
   #cat .cat-head,
+  #cat .cat-ear,
   #cat .cat-tail,
+  #cat .cat-tail2,
+  #cat .cat-tail3,
   #cat .cat-leg,
+  #cat .cat-shin,
   #cat .cat-eye {
     animation: none !important;
   }
