@@ -601,8 +601,7 @@ body.cursor-fx #cat { display: block; }
 #cat.cat--running .cat-tail  { animation: run-tail1 .42s ease-in-out infinite; }
 #cat.cat--running .cat-tail2 { animation: run-tail2 .42s ease-in-out infinite; animation-delay: -.06s; }
 #cat.cat--running .cat-tail3 { animation: run-tail3 .42s ease-in-out infinite; animation-delay: -.12s; }
-/* Большие глаза моргают и в беге (реже, чем шаг лап). */
-#cat.cat--running .cat-eye  { animation: eye-blink 2.6s ease-in-out infinite; }
+/* В беге глаза не моргают — остаются открытыми. */
 @keyframes run-thigh {
   0%   { transform: rotate(26deg); }   /* вынос вперёд */
   25%  { transform: rotate(2deg); }    /* постановка */
@@ -751,8 +750,8 @@ body.cursor-fx #cat { display: block; }
 }
 /* Большие глаза моргают: почти весь цикл открыты, изредка короткое схлопывание
    века через scaleY (origin по центру глаза). Склера+тёмный глаз+блики
-   сгруппированы в .cat-eye и моргают вместе. Общий кейфрейм для бега и покоя —
-   разница только в длительности. */
+   сгруппированы в .cat-eye и моргают вместе. Используется только в покое
+   (cat--sitting). */
 @keyframes eye-blink {
   0%, 88% { transform: scaleY(1); }   /* большую часть цикла глаз открыт */
   92%     { transform: scaleY(.06); } /* полностью закрылся */
