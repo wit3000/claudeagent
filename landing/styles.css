@@ -531,7 +531,11 @@ body.cursor-fx #cat { display: block; }
 #cat {
   margin: -30px 0 0 -30px;
 }
-.cat-svg { display: block; }
+/* overflow:visible — иначе корневой <svg> клипает всё за viewBox, и на прыжке
+   (риг уезжает вверх) кончики ушей и хвост срезаются по верху вьюпорта.
+   Контейнер #cat не клипает (у него нет overflow:hidden), центровка спрайта
+   на координате курсора не меняется. */
+.cat-svg { display: block; overflow: visible; }
 
 /* Точки вращения суставов рига. Урок пробы: transform-box:fill-box на <g> в
    ряде браузеров даёт нулевой bbox → transform-origin в % не срабатывает.
@@ -746,7 +750,7 @@ body.cursor-fx #cat { display: block; }
   97%           { transform: rotate(-2deg); }
 }
 /* Большие глаза моргают: почти весь цикл открыты, изредка короткое схлопывание
-   века через scaleY (origin по центру глаза). Радужка+зрачок+блики
+   века через scaleY (origin по центру глаза). Склера+тёмный глаз+блики
    сгруппированы в .cat-eye и моргают вместе. Общий кейфрейм для бега и покоя —
    разница только в длительности. */
 @keyframes eye-blink {
