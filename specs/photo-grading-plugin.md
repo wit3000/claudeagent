@@ -1,851 +1,774 @@
-# ТЗ: Photograde — плагин параметрической обработки фото «в стилистике X» для LLM-агента
+# ТЗ: Photograde — Custom GPT для параметрической обработки фото «в стилистике X»
 
-Статус: **рабочий вариант с допущениями.** Открытые вопросы к пользователю
-перечислены в разделе 0.4; до ответа на них реализация идёт по допущениям
-A1–A7. Если ответ пользователя противоречит допущению — правится этот файл,
-а не код «по месту».
+Статус: **версия 2.** Переписано под ответы пользователя (Custom GPT вместо
+MCP, без RAW). Непроверенные факты о платформе явно помечены
+«не проверено» — по ним заложены консервативные допущения.
 
 ## 0. Контекст
 
 ### 0.1. Что хочет пользователь
 
-Пользователь присылает фото и просит обработать его «в стилистике»
-(например, цветокоррекция как в сериале Twin Peaks или Supernatural). Агент
-подбирает стиль (по встроенной библиотеке «луков» или по референс-кадру) и
-выполняет цветокоррекцию и прочую обработку в терминах параметров
-Lightroom: свет, баланс белого, кривые, HSL, детализация, оптика/геометрия,
-эффекты, локальные маски. Результат — обработанный файл плюс
-переиспользуемый пресет (Lightroom XMP и `.cube` LUT).
+Пользователь хочет «скачать плагин и загрузить его в ChatGPT»: присылает
+фото, просит обработать «в стилистике» (например, цветокоррекция как в
+Twin Peaks или Supernatural), получает обработанный файл, сравнение «до/после»
+и переиспользуемый пресет (Lightroom XMP и `.cube` LUT).
 
 ### 0.2. Ключевые архитектурные решения (обязательны к прочтению)
 
-1. **Модель-генератор изображений не может «подтягивать плагин».**
-   gpt-image-2 / gpt-image-2.5 (OpenAI выпустила Images 2.5 08.09.2026,
-   в API — `gpt-image-2.5-flare` и `gpt-image-2.5-sunburst`) — это модели,
-   которые получают промпт/картинку и возвращают картинку. Инструменты
-   (tools) вызывает агентский рантайм: LLM-ассистент в Claude Code / Claude
-   Desktop (MCP), ChatGPT (Apps SDK поверх MCP или Custom GPT Actions),
-   OpenAI Responses/Agents API (function tools / remote MCP). Поэтому
-   плагин — это **MCP-сервер с инструментами**, которые вызывает LLM-агент
-   с vision; генератор изображений в основном контуре не участвует.
-2. **Обработка — детерминированная и параметрическая, а не генеративная.**
-   Генеративное редактирование (images/edits) перерисовывает кадр:
-   дрейф лиц и мелких деталей, галлюцинации, ограничение разрешения
-   (порядка 2K), потеря EXIF и исходного качества. Это не цветокоррекция.
-   Схема плагина:
-   `LLM-агент (vision) → ParamSet (JSON) → движок на numpy/OpenCV → файл + XMP + LUT`.
-   Агент только выбирает параметры и смотрит превью; пиксели меняет код.
-3. **Референсы.** Плагин не скачивает кадры из сериалов. Источники стиля:
-   (а) встроенная библиотека описаний луков (`looks/*.json` — параметры и
-   описание палитры, никаких кадров); (б) референс-кадр, который приложил
-   пользователь → алгоритмический подбор параметров (`match_reference`);
-   (в) веб-поиск — вне плагина: если у агента-хоста есть свой веб-поиск,
-   он может использовать его для текстового описания стиля и затем
-   настроить параметры; плагин URL не принимает (см. раздел 3).
-4. **Численное совпадение с рендером Lightroom — не цель.** Параметры
-   повторяют семантику и диапазоны Lightroom, но алгоритмы свои. XMP-пресет,
-   открытый в Lightroom, даст похожий, но не идентичный результат. Это
-   документируется в README плагина и в отчёте `export`.
+1. **Платформа MVP — Custom GPT.** Сторонний код как «плагин» ChatGPT не
+   принимает. Пользователь сам собирает GPT в конструкторе: вставляет текст
+   инструкций в поле Instructions, загружает файлы в Knowledge, включает
+   Code Interpreter и веб-поиск. Движок — Python-модуль, который GPT
+   импортирует в песочнице Code Interpreter и запускает над загруженным фото.
+2. **Обработка детерминированная и параметрическая, не генеративная.**
+   Модель (vision + рассуждение) выбирает параметры `ParamSet` (JSON),
+   движок применяет их кодом. gpt-image не используется (фаза 2):
+   генеративное редактирование перерисовывает кадр (дрейф лиц и деталей,
+   ограничение разрешения, потеря EXIF).
+3. **Движок работает только на numpy + Pillow + стандартной библиотеке.**
+   OpenCV, если импортируется, используется как необязательное ускорение
+   с фолбэком на numpy. scipy, pydantic и прочее не используются. Причина:
+   в песочнице нет интернета и `pip install`; состав предустановленных
+   библиотек официально не задокументирован и может меняться.
+4. **Референсы.** GPT может искать описания стиля веб-поиском ChatGPT, но
+   скачать картинки в песочницу не может (там нет сети). Поэтому:
+   (а) встроенная библиотека луков `looks.json` (параметры и описание
+   палитры, никаких кадров); (б) референс-кадр, присланный пользователем
+   в чат → `match_reference`; (в) текстовое описание из веб-поиска → GPT
+   переводит его в параметры по словарю из `reference.md`. GPT не обещает
+   скопировать чужие кадры.
+5. **Совпадение с рендером Lightroom 1:1 — не цель.** Параметры повторяют
+   семантику и диапазоны LR, алгоритмы свои; XMP в LR даст похожий, но не
+   идентичный результат.
 
-### 0.3. Допущения (до ответа пользователя)
+### 0.3. Что известно о платформе (проверено по открытым источникам, 2026)
 
-- **A1. Рантайм:** локальный MCP-сервер (stdio) на Python для Claude Code /
-  Claude Desktop + CLI. Ядро не зависит от MCP, чтобы позже обернуть его в
-  HTTP-MCP для ChatGPT Apps или в function tools OpenAI API.
-- **A2. Форматы:** JPEG, PNG, TIFF (8/16 бит), WebP — в ядре. HEIC —
-  опционально через extra `heic`. RAW — опционально через extra `raw`
-  (rawpy/LibRaw). Тесты RAW пропускаются, если rawpy не установлен.
-- **A3. Выход:** обработанный файл (JPEG/TIFF16/PNG) + Lightroom XMP-пресет
-  + `.cube` LUT. Все три входят в MVP.
-- **A4. Автопоиск референсов в интернете:** не реализуется в плагине.
-- **A5. Генеративный режим (gpt-image):** не входит в MVP, описан в 2.13
-  как фаза 2.
-- **A6. ИИ-маски (небо, человек, объект):** не входят в MVP, фаза 2
-  (2.8.3). В MVP — геометрические маски и маски по диапазонам.
-- **A7. Размещение в репозитории:** отдельный пакет `plugins/photograde/`
-  со своим `pyproject.toml`. Пакет `reviewer` не затрагивается.
+| Факт | Значение | Статус |
+|---|---|---|
+| Лимит поля Instructions | 8000 символов | подтверждено отчётами на форуме OpenAI; официальную справку прочитать не удалось (help.openai.com недоступен из среды подготовки ТЗ) |
+| Лимит Knowledge | до 20 файлов, ≤ 512 МБ на файл, ≤ 2M токенов на текстовый файл | источники расходятся (10 или 20 файлов); закладываемся на ≤ 4 файла |
+| Код в песочнице | Python 3.13.5, NumPy 2.3.5, Pillow 12.1.1, opencv-python-headless 4.13, SciPy 1.17 (снимок окружения на март 2026) | неофициальный gist; состав может меняться → OpenCV/scipy не обязательны |
+| Сеть в песочнице | исходящих запросов нет | подтверждено несколькими источниками |
+| Время на один вызов кода | исторически ~60 с, есть отчёты о большем | не проверено → проектируем под ≤ 45 с на вызов |
+| Память песочницы | не опубликована | не проверено → бюджет ≤ 1.5 ГБ пиковой памяти |
+| Файлы Knowledge доступны в `/mnt/data` | обычно да | не проверено официально; известны случаи, когда GPT переписывает код вместо импорта, и баг-репорт «Code Interpreter не работает у не-авторов GPT с Knowledge-файлами» → есть фолбэк (2.11.1) |
+| Создание Custom GPT | требуется платный план ChatGPT | не проверено на текущий момент — пользователь подтверждает сам |
 
-### 0.4. Открытые вопросы к пользователю
+### 0.4. Допущения
 
-1. Где должен жить плагин: Claude Code / Claude Desktop (MCP), ChatGPT
-   (Custom GPT / Apps — нужен публичный HTTPS-сервер), OpenAI API-агент,
-   или всё сразу?
-2. Нужна ли поддержка RAW и с каких камер (CR3, NEF, ARW, RAF, DNG)?
-3. Какой результат нужен: только картинка / + XMP / + LUT?
-4. Насколько обязателен автопоиск референсов в интернете, или достаточно
-   библиотеки луков + референса от пользователя?
-5. Нужны ли ИИ-маски (небо/человек/кожа) в первой версии?
-6. Нужен ли вообще генеративный режим gpt-image, и есть ли бюджет на
-   платный API?
+- **A1.** Платформа MVP — Custom GPT (Instructions + Knowledge + Code
+  Interpreter + веб-поиск). MCP-сервер и HTTP-обёртка — фаза 2, ядро общее.
+- **A2.** Форматы: JPEG, PNG, TIFF. 8 бит — всегда; 16-бит RGB — только при
+  наличии OpenCV в окружении (иначе понятная ошибка, 2.6). RAW, HEIC, WebP
+  не поддерживаются.
+- **A3.** Выход: JPEG (по умолчанию) или PNG/TIFF + картинка «до/после» +
+  XMP + `.cube`.
+- **A4.** Рабочий размер по умолчанию: превью ≤ 1024 px, экспорт ≤ 4096 px по
+  длинной стороне; полный размер — по явной просьбе (`max_side=None`) с
+  предупреждением о возможном таймауте.
+- **A5.** gpt-image и ИИ-маски — фаза 2.
+- **A6.** Размещение: `plugins/photograde/`; в папке `gpt/` лежит ровно то,
+  что пользователь загружает в конструктор.
+- **A7.** Приёмку «в живом GPT» выполняет пользователь (у Лупы нет доступа
+  к ChatGPT); Лупа отвечает за локальные тесты и чек-лист.
+
+### 0.5. Открытые вопросы (не блокируют реализацию)
+
+1. Есть ли у пользователя платный план ChatGPT, позволяющий создавать GPT?
+2. GPT приватный или публичный? Файлы Knowledge публичного GPT могут быть
+   извлечены пользователями — для открытого движка это не проблема, но
+   пользователь должен об этом знать.
+3. Какая версия Lightroom/Camera Raw у пользователя — для ручной проверки XMP.
 
 ## 1. Что уже работает (не ломать)
 
-- Репозиторий содержит сервис `reviewer` (Triple-Pass Text Reviewer):
-  `src/reviewer/**`, `app.py`, `tests/*.py`, корневой `pyproject.toml`
-  (пакет `reviewer`, `testpaths = ["tests"]`), `requirements.txt`,
-  `Dockerfile`, `scripts/deploy_hf.py`, `landing/`.
+- Репозиторий содержит сервис `reviewer`: `src/reviewer/**`, `app.py`,
+  `tests/*.py`, корневой `pyproject.toml` (`testpaths = ["tests"]`),
+  `requirements.txt`, `Dockerfile`, `scripts/deploy_hf.py`, `landing/`.
 - **Запрещено** менять файлы вне `plugins/photograde/`, кроме одной строки
-  в корневом `README.md` (2.14). В частности, не трогать корневой
-  `pyproject.toml`, `requirements.txt`, `Dockerfile` — зависимости плагина
-  (numpy, opencv) не должны попасть в сборку `reviewer` и в деплой на HF
-  (`scripts/deploy_hf.py` заливает только `app.py`, `requirements.txt`,
-  `README.md`, `src/` — `plugins/` туда не попадает, так и должно остаться).
-- Корневой прогон `pytest -q` (тесты `reviewer`) должен оставаться зелёным
-  и не должен собирать тесты плагина.
+  в корневом `README.md` (2.14). Корневые `pyproject.toml`,
+  `requirements.txt`, `Dockerfile`, `.gitignore` не трогать.
+- Корневой `pytest -q` остаётся зелёным и не собирает тесты плагина.
+- `scripts/deploy_hf.py` не должен начать заливать `plugins/` (он заливает
+  только `app.py`, `requirements.txt`, `README.md`, `src/` — так и остаётся).
 
 ## 2. Задача
 
-### 2.1. Структура пакета
-
-Создать:
+### 2.1. Структура и поставка
 
 ```
 plugins/photograde/
-  pyproject.toml
-  README.md                 # установка, подключение к Claude Code, ограничения
-  AGENT_GUIDE.md            # инструкция агенту (отдаётся как MCP prompt)
-  scripts/regen_golden.py   # перегенерация golden-эталонов
-  src/photograde/
-    __init__.py             # __version__ = "0.1.0"
-    errors.py               # PhotogradeError и наследники (см. ниже)
-    schema.py               # ParamSet (pydantic v2), диапазоны, normalize_params, JSON Schema
-    color.py                # sRGB OETF/EOTF, luma, RGB<->HSV, linear sRGB<->Lab (D65)
-    io.py                   # загрузка/сохранение, ICC, EXIF, ориентация, RAW, alpha
-    pipeline.py             # render(img, params, scale) — порядок стадий 2.4
-    stages/
-      __init__.py
-      noise.py  geometry.py  wb.py  tone.py  presence.py
-      curve.py  hsl.py  grading.py  saturation.py  local.py
-      sharpen.py  effects.py
-    masks.py                # построение масок (2.8)
-    geometry_detect.py      # авто-горизонт/вертикали (2.4.3)
-    analyze.py              # статистика изображения (2.9.1)
-    match.py                # подбор ParamSet по референсу (2.9.2)
-    looks.py                # загрузка библиотеки луков, compose
-    looks/*.json            # 8 луков (2.10)
-    export_xmp.py           # Lightroom XMP (2.11)
-    export_cube.py          # .cube LUT (2.12)
-    session.py              # хранилище загруженных фото
-    mcp_server.py           # MCP-инструменты (2.7)
-    cli.py                  # typer CLI (2.7.3)
+  gpt/                        # РОВНО то, что загружается в конструктор GPT
+    photograde.py             # движок: один модуль, numpy + Pillow (+ cv2 опционально)
+    looks.json                # библиотека луков (2.10)
+    reference.md              # Knowledge: справочник для GPT (2.11.2)
+    instructions.md           # текст для поля Instructions (≤ 7500 символов, 2.11.1)
+  GUIDE_RU.md                 # гайд для пользователя «как собрать свой GPT» (2.13)
+  README.md                   # для разработчика: структура, тесты, сборка
+  pyproject.toml              # только для локальной разработки/тестов
+  .gitignore                  # dist/
+  scripts/
+    regen_golden.py           # перегенерация golden-эталонов
+    build_bundle.py           # dist/photograde-gpt.zip = gpt/* + GUIDE_RU.md
   tests/
-    conftest.py             # синтетические изображения (6.1)
+    conftest.py               # sys.path -> gpt/, синтетические изображения (6.1)
     golden/cases.json
     golden/*.npz
-    test_schema.py test_color.py test_io.py test_stages_*.py test_pipeline.py
-    test_masks.py test_geometry_detect.py test_match.py test_looks.py
-    test_export_xmp.py test_export_cube.py test_mcp_tools.py test_cli.py test_golden.py
+    test_spec.py test_color.py test_io.py test_stages.py test_geometry.py
+    test_masks.py test_analyze_match.py test_looks.py test_export.py
+    test_api.py test_backends.py test_gpt_texts.py test_golden.py test_perf.py
 ```
 
-`errors.py`: `PhotogradeError(Exception)`; наследники
-`UnsupportedFormatError`, `CorruptImageError`, `ImageTooLargeError`,
-`GeometryError`, `UnknownPhotoError`, `LookNotFoundError`.
+**Почему один модуль, а не zip-пакет:** Knowledge гарантированно принимает
+текстовые файлы; приём `.zip` и сохранность его имени не проверены. Один
+`.py` импортируется двумя строками (`sys.path.insert(0, "/mnt/data")`,
+`import photograde`), и тестируется ровно тот файл, который поставляется.
+Объём модуля ориентировочно 2500–3500 строк — допустимо; модуль разбит на
+секции с заголовками-комментариями в порядке разделов этого ТЗ.
 
-`pyproject.toml` плагина:
+Требования к `photograde.py`:
 
-- `name = "photograde"`, `version = "0.1.0"`, `requires-python = ">=3.11"`,
-  layout `src/`, build-backend setuptools (как в корне).
-- `dependencies`: `numpy>=1.26`, `opencv-python-headless>=4.9`,
-  `Pillow>=10.3`, `pydantic>=2.6`, `typer>=0.12`, `mcp>=1.2`.
-- `optional-dependencies`: `raw = ["rawpy>=0.19"]`,
-  `heic = ["pillow-heif>=0.16"]`, `dev = ["pytest>=8.0", "ruff>=0.6"]`.
-  Extras `ai` и `generative` в MVP не создавать.
-- `project.scripts`: `photograde = "photograde.cli:app"`,
-  `photograde-mcp = "photograde.mcp_server:main"`.
-- `package-data`: `photograde/looks/*.json`.
-- `[tool.pytest.ini_options] testpaths = ["tests"]`, маркер `slow`
-  зарегистрирован, по умолчанию `addopts = "-m 'not slow'"`.
-- `[tool.ruff] line-length = 100`, `select = ["E", "F", "I"]`.
+- Совместимость: Python ≥ 3.10 (в песочнице 3.13), numpy ≥ 1.24 и 2.x,
+  Pillow ≥ 9.5. Только стандартная библиотека + numpy + Pillow; `cv2`
+  импортируется в `try/except ImportError` (2.3.4).
+- При импорте — никаких вычислений, вывода в stdout, записи файлов.
+- `__version__ = "0.1.0"`; `ENGINE_INFO()` →
+  `{"version", "numpy", "pillow", "cv2": str | None, "backend": "cv2" | "numpy"}`.
+- Все публичные функции имеют docstring на английском с примером вызова
+  (GPT читает их через `help()`).
+- Исключения: `PhotogradeError(Exception)` и наследники `ParamError`,
+  `UnsupportedFormatError`, `CorruptImageError`, `ImageTooLargeError`,
+  `GeometryError`, `LookNotFoundError`. Сообщения — на английском, с путём к
+  полю и подсказкой, что исправить (например
+  `"light.exposur: unknown key. Did you mean 'exposure'?"` — подсказка через
+  `difflib.get_close_matches`).
 
-### 2.2. Схема параметров (`schema.py`)
+`pyproject.toml` (локальная разработка): `[project] name = "photograde"`,
+`version = "0.1.0"`, `requires-python = ">=3.10"`,
+`dependencies = ["numpy>=1.24", "Pillow>=9.5"]`,
+`optional-dependencies: accel = ["opencv-python-headless>=4.8"], dev = ["pytest>=8.0", "ruff>=0.6"]`;
+`[tool.setuptools] py-modules = ["photograde"]`, `package-dir = {"" = "gpt"}`;
+`[tool.pytest.ini_options] testpaths = ["tests"]`, маркер `slow`,
+`addopts = "-m 'not slow'"`; ruff: line-length 100, select E, F, I.
 
-Pydantic v2-модели, у всех `model_config = ConfigDict(extra="forbid")`
-(опечатка LLM в имени ключа = ошибка валидации с именем поля). Все поля
-имеют дефолт = «нейтрально», поэтому допускается частичный ParamSet.
-Диапазоны повторяют Lightroom.
+`scripts/build_bundle.py`: собирает `dist/photograde-gpt.zip` из
+`gpt/photograde.py`, `gpt/looks.json`, `gpt/reference.md`,
+`gpt/instructions.md`, `GUIDE_RU.md`; перед сборкой проверяет длину
+`instructions.md` (≤ 7500 символов) и импортируемость модуля; печатает
+список файлов и их размеры.
 
-Нотация: `int[-100..100]=0` — целое, диапазон, дефолт. `float` — шаг 0.01,
-если не указано иное.
+### 2.2. Схема параметров (`ParamSet`)
+
+ParamSet — обычный `dict` (JSON). Валидация — собственная, без pydantic:
+таблица `PARAM_SPEC` в модуле описывает для каждого поля тип, диапазон,
+дефолт. Из неё же генерируются дефолты, клампинг, сообщения об ошибках и
+JSON Schema (`schema()`).
+
+Нотация: `int[-100..100]=0` — целое, диапазон, дефолт; `float` — шаг 0.01.
+Все поля имеют нейтральный дефолт, допускается частичный ParamSet.
 
 ```
-ParamSet
-  version: Literal[1] = 1
-  white_balance:
-    temp:  int[-100..100]=0      # относительный сдвиг (как у LR для JPEG)
-    tint:  int[-100..100]=0      # + = маджента, - = зелёный
-  light:
-    exposure:   float[-5.0..5.0]=0.0   # EV
-    contrast:   int[-100..100]=0
-    highlights: int[-100..100]=0
-    shadows:    int[-100..100]=0
-    whites:     int[-100..100]=0
-    blacks:     int[-100..100]=0
-  presence:
-    texture:    int[-100..100]=0
-    clarity:    int[-100..100]=0
-    dehaze:     int[-100..100]=0
-    vibrance:   int[-100..100]=0
-    saturation: int[-100..100]=0
-  tone_curve:                     # точки [x, y], x,y int 0..255
-    master: list[[int,int]] = [[0,0],[255,255]]
-    red:    list[[int,int]] = [[0,0],[255,255]]
-    green:  list[[int,int]] = [[0,0],[255,255]]
-    blue:   list[[int,int]] = [[0,0],[255,255]]
-  hsl:                            # Color: red, orange, yellow, green, aqua, blue, purple, magenta
-    hue:        dict[Color, int[-100..100]]  (отсутствующий ключ = 0)
-    saturation: dict[Color, int[-100..100]]
-    luminance:  dict[Color, int[-100..100]]
-  color_grading:
-    shadows:    {hue: int[0..359]=0, sat: int[0..100]=0, lum: int[-100..100]=0}
-    midtones:   {hue, sat, lum}
-    highlights: {hue, sat, lum}
-    global_:    {hue, sat, lum}     # в JSON — ключ "global" (alias)
-    blending:   int[0..100]=50
-    balance:    int[-100..100]=0
-  detail:
-    sharpening:
-      amount:  int[0..150]=0
-      radius:  float[0.5..3.0]=1.0  # пиксели полного разрешения, шаг 0.1
-      detail:  int[0..100]=25
-      masking: int[0..100]=0
-    noise_reduction:
-      luminance:          int[0..100]=0
-      luminance_detail:   int[0..100]=50
-      luminance_contrast: int[0..100]=0
-      color:              int[0..100]=0
-      color_detail:       int[0..100]=50
-      color_smoothness:   int[0..100]=50
-  lens:
-    distortion:          int[-100..100]=0   # + исправляет бочку
-    vignetting:          int[-100..100]=0   # + осветляет углы (коррекция объектива)
-    vignetting_midpoint: int[0..100]=50
-    chromatic_aberration:
-      remove:      bool=False             # авто-коррекция латеральной ХА
-      red_cyan:    int[-100..100]=0       # ручная
-      blue_yellow: int[-100..100]=0       # ручная
-  transform:
-    upright:    Literal["off","level","vertical"]="off"   # авто, см. 2.4.3
-    vertical:   int[-100..100]=0
-    horizontal: int[-100..100]=0
-    rotate:     float[-10.0..10.0]=0.0    # градусы, шаг 0.1
-    aspect:     int[-100..100]=0
-    scale:      int[50..150]=100
-    offset_x:   float[-100..100]=0.0
-    offset_y:   float[-100..100]=0.0
-    constrain:  bool=True                 # авто-масштаб без пустых краёв
-  crop: null | {left, top, right, bottom: float[0..1], angle: float[-45..45]=0}
-                                          # доли кадра; left<right, top<bottom
-  effects:
-    vignette:
-      amount:     int[-100..100]=0
-      midpoint:   int[0..100]=50
-      roundness:  int[-100..100]=0
-      feather:    int[0..100]=50
-      highlights: int[0..100]=0
-      style: Literal["highlight_priority","color_priority","paint_overlay"]="highlight_priority"
-    grain:
-      amount:    int[0..100]=0
-      size:      int[0..100]=25
-      roughness: int[0..100]=50
-      seed:      int>=0 = 0
-  local: list[LocalAdjustment] = []   # максимум 16 элементов
+version: 1
+white_balance:
+  temp:  int[-100..100]=0      # относительный сдвиг (как у LR для JPEG)
+  tint:  int[-100..100]=0      # + маджента, - зелёный
+light:
+  exposure:   float[-5.0..5.0]=0.0   # EV
+  contrast, highlights, shadows, whites, blacks: int[-100..100]=0
+presence:
+  texture, clarity, dehaze, vibrance, saturation: int[-100..100]=0
+tone_curve:                     # точки [x, y], int 0..255, 2..16 точек
+  master, red, green, blue: list[[int,int]] = [[0,0],[255,255]]
+hsl:                            # Color: red, orange, yellow, green, aqua, blue, purple, magenta
+  hue, saturation, luminance: {Color: int[-100..100]}   # отсутствующий ключ = 0
+color_grading:
+  shadows, midtones, highlights, global: {hue: int[0..359]=0, sat: int[0..100]=0, lum: int[-100..100]=0}
+  blending: int[0..100]=50
+  balance:  int[-100..100]=0
+detail:
+  sharpening:      {amount: int[0..150]=0, radius: float[0.5..3.0]=1.0, detail: int[0..100]=25, masking: int[0..100]=0}
+  noise_reduction: {luminance: int[0..100]=0, luminance_detail: int[0..100]=50,
+                    luminance_contrast: int[0..100]=0, color: int[0..100]=0,
+                    color_detail: int[0..100]=50, color_smoothness: int[0..100]=50}
+lens:
+  distortion:          int[-100..100]=0   # + исправляет бочку
+  vignetting:          int[-100..100]=0   # + осветляет углы (коррекция объектива)
+  vignetting_midpoint: int[0..100]=50
+  chromatic_aberration: {remove: bool=False, red_cyan: int[-100..100]=0, blue_yellow: int[-100..100]=0}
+transform:
+  upright:    "off"|"level"|"vertical" = "off"
+  vertical, horizontal, aspect: int[-100..100]=0
+  rotate:     float[-10.0..10.0]=0.0     # градусы
+  scale:      int[50..150]=100
+  offset_x, offset_y: float[-100..100]=0.0
+  constrain:  bool=True
+crop: null | {left, top, right, bottom: float[0..1], angle: float[-45..45]=0}   # left<right, top<bottom
+effects:
+  vignette: {amount: int[-100..100]=0, midpoint: int[0..100]=50, roundness: int[-100..100]=0,
+             feather: int[0..100]=50, highlights: int[0..100]=0,
+             style: "highlight_priority"|"color_priority"|"paint_overlay" = "highlight_priority"}
+  grain:    {amount: int[0..100]=0, size: int[0..100]=25, roughness: int[0..100]=50, seed: int>=0 = 0}
+local: list[LocalAdjustment] = []   # ≤ 16, раздел 2.8
 ```
 
-`LocalAdjustment` — раздел 2.8.
+`normalize(params: dict | None) -> tuple[dict, list[str]]`:
 
-**Нормализация.** `normalize_params(raw: dict) -> tuple[ParamSet, list[str]]`:
+- Возвращает **полный** ParamSet (все поля заполнены) и предупреждения.
+- Неизвестный ключ, неверный тип (не-число в числовом поле, не-список в
+  кривой), неизвестный цвет HSL, неизвестный `style`/`upright`/`type` маски
+  → `ParamError` с путём к полю и подсказкой.
+- Строковые числа (`"15"`) принимаются с предупреждением; bool в числовом
+  поле — ошибка.
+- Числа вне диапазона клампятся, предупреждение
+  `"light.exposure: 7.0 -> 5.0 (clamped)"`; дробное в int-поле округляется
+  без предупреждения.
+- Кривые: сортировка по x; дубликаты x, < 2 или > 16 точек → ошибка;
+  координаты вне 0..255 клампятся с предупреждением.
+- `crop.left >= right` или `top >= bottom` → ошибка; `local` > 16 → ошибка.
+- Идемпотентность: `normalize(normalize(p)[0]) == (normalize(p)[0], [])`.
 
-- Неизвестные ключи и неверные типы → `pydantic.ValidationError`
-  (пробрасывается наружу; MCP-инструмент возвращает текст ошибки).
-- Числа вне диапазона **клампятся** к границе; для каждого клампа в список
-  предупреждений добавляется строка вида
-  `"light.exposure: 7.0 -> 5.0 (clamped)"`. Дробное число в int-поле
-  округляется (без предупреждения).
-- Кривые: точки сортируются по x; дубликаты x → ошибка; меньше 2 или
-  больше 16 точек → ошибка; координаты вне 0..255 клампятся с
-  предупреждением.
-- `crop`: `left >= right` или `top >= bottom` → ошибка.
-- `hsl`: неизвестный цвет → ошибка.
-- `local`: больше 16 элементов → ошибка.
+`schema() -> dict` — JSON Schema (draft 2020-12) из `PARAM_SPEC`.
+`describe_params() -> str` — компактная текстовая таблица полей
+(путь, тип, диапазон, дефолт, одна строка смысла) для GPT.
 
-`param_json_schema() -> dict` — `ParamSet.model_json_schema(by_alias=True)`,
-отдаётся инструментом `get_param_schema`.
+### 2.3. Цвет, ресемплинг, бэкенды
 
-### 2.3. Цветовая модель (`color.py`)
+#### 2.3.1. Цветовая модель
 
-- Рабочее пространство движка: **линейный RGB с праймериз sRGB/Rec.709,
-  float32, значения ≥ 0, без верхнего клампа** (превышение 1.0 = пересвет,
-  клампится только при кодировании результата).
-- Перцептивное представление = sRGB OETF (кусочная формула
-  IEC 61966-2-1) от линейных значений; для значений > 1 — продолжение
-  степенной ветки. EOTF — обратная функция.
-- Luma: `0.2126 R + 0.7152 G + 0.0722 B`. «Линейная luma» `Y` — на линейных
-  значениях, «перцептивная luma» `l` — та же формула на перцептивных.
-- RGB↔HSV — векторизованно на numpy, hue в градусах [0, 360).
-- linear sRGB ↔ CIE Lab (D65, стандартная матрица sRGB→XYZ).
-- Функции принимают `np.ndarray` формы (H, W, 3) float32 и возвращают ту же
-  форму.
+- Рабочее пространство: **линейный RGB (праймериз sRGB/Rec.709), float32,
+  ≥ 0, без верхнего клампа** до кодирования результата.
+- Перцептивное = sRGB OETF (IEC 61966-2-1; для > 1 — продолжение степенной
+  ветки); EOTF — обратная.
+- Luma: `0.2126 R + 0.7152 G + 0.0722 B`; `Y` — на линейных, `l` — на
+  перцептивных значениях.
+- RGB↔HSV (hue в градусах [0,360)) и linear sRGB↔CIE Lab (D65) —
+  векторизованно на numpy.
 
-### 2.4. Пайплайн (`pipeline.py`)
+#### 2.3.2. Примитивы (numpy-реализация обязательна)
 
-`render(img_linear: np.ndarray, params: ParamSet, *, scale: float = 1.0,
-original_long_edge: int | None = None) -> RenderResult`, где
-`RenderResult(image: np.ndarray, warnings: list[str], applied_upright: dict | None)`.
+- `_gaussian(img, sigma)`: sigma < 0.3 → без изменений; sigma ≤ 4 —
+  сепарабельная свёртка ядром радиуса `ceil(3*sigma)` (сумма сдвинутых
+  срезов, паддинг reflect); sigma > 4 — три прохода box-blur через
+  кумулятивные суммы с ширинами по формуле аппроксимации Гаусса тремя
+  box-фильтрами (Kovesi). Вход 2D или 3D (по каналам).
+- `_box(img, r)` — box-фильтр через кумулятивные суммы, паддинг reflect.
+- `_guided_filter(I, p, r, eps)` — guided filter (He et al.) на `_box`.
+- `_min_filter(img2d, k)` — сепарабельный минимум
+  (`np.lib.stride_tricks.sliding_window_view` по каждой оси).
+- `_sample_bilinear(channel, map_x, map_y, fill=0.0)` — билинейная выборка
+  по картам координат (векторизованно), вне кадра → `fill`.
+- `_resize(img, (w, h), kind)` — по каналам через Pillow mode `"F"`:
+  уменьшение — `Image.Resampling.BOX`, увеличение — `BICUBIC`.
+- `_kmeans(samples, k, iters, seed)` — k-means++ init с
+  `np.random.default_rng(seed)`, `iters` итераций Ллойда.
+- `_sobel_mag(l)` — модуль градиента Собеля (свёртка срезами).
 
-`scale` = (длинная сторона обрабатываемого изображения) / (длинная сторона
-оригинала); `original_long_edge` по умолчанию = длинная сторона входа.
-Все радиусы в пикселях (NR, шарпинг, clarity, зерно, кисти) умножаются на
-`scale`, чтобы превью и полноразмерный экспорт выглядели одинаково.
-Пиксельные константы ниже заданы для **оригинала**.
+#### 2.3.3. Порог размера и память
 
-Порядок стадий (фиксированный; стадия с нейтральными параметрами
-пропускается без вычислений):
+- `MAX_INPUT_MP = 100` (проверка по размеру из заголовка Pillow до
+  декодирования) → иначе `ImageTooLargeError`. `Image.MAX_IMAGE_PIXELS`
+  выставляется в `MAX_INPUT_MP*1e6` на время открытия и восстанавливается.
+- При `max_side=4096` (~11 Мп) пиковое потребление ≤ 1.5 ГБ:
+  промежуточные буферы освобождать (`del`), float32 везде, никаких float64
+  массивов полного размера.
 
-| # | Стадия | Модуль | Пространство |
-|---|--------|--------|--------------|
-| 1 | Шумоподавление | `stages/noise.py` | перцептивное |
-| 2 | Геометрия: дисторсия + ХА + transform + crop (один remap); коррекция виньетирования объектива | `stages/geometry.py` | линейное |
-| 3 | Баланс белого | `stages/wb.py` | линейное |
-| 4 | Экспозиция | `stages/tone.py` | линейное |
-| 5 | Whites/Blacks → Highlights/Shadows → Contrast | `stages/tone.py` | перцептивная luma |
-| 6 | Dehaze → Clarity → Texture | `stages/presence.py` | перцептивное |
-| 7 | Tone Curve: master, затем R/G/B | `stages/curve.py` | перцептивное |
-| 8 | HSL / Color Mixer | `stages/hsl.py` | перцептивное (HSV) |
-| 9 | Color Grading | `stages/grading.py` | перцептивное |
-| 10 | Vibrance, Saturation | `stages/saturation.py` | перцептивное |
-| 11 | Локальные коррекции | `stages/local.py` | по параметру |
-| 12 | Шарпинг | `stages/sharpen.py` | перцептивная luma |
-| 13 | Виньетка (post-crop) | `stages/effects.py` | см. 2.4.13 |
-| 14 | Зерно | `stages/effects.py` | перцептивное |
+#### 2.3.4. Бэкенды
 
-**Почему порядок отличается от «WB → тон → кривая → HSL → детали → оптика
-→ эффекты → маски»:** шумоподавление идёт до тональных операций (иначе
-поднятые тени усиливают шум; в LR NR тоже привязано к ранней стадии);
-геометрия — до всего остального, чтобы виньетка и зерно ложились на
-финальный кадр, а маски задавались в координатах финального кадра;
-локальные коррекции — до шарпинга и эффектов (в LR зерно и виньетка
-накладываются поверх локальных правок).
+- `_BACKEND = "cv2"`, если `import cv2` успешен и не задана переменная
+  окружения `PHOTOGRADE_BACKEND=numpy`; иначе `"numpy"`.
+- `cv2` используется только для: `_gaussian` (`cv2.GaussianBlur`), `_box`
+  (`cv2.blur`), `_min_filter` (`cv2.erode`), `_sample_bilinear`
+  (`cv2.remap`, `INTER_LINEAR`), `_resize` (`INTER_AREA`/`INTER_CUBIC`),
+  чтение/запись 16-бит (2.6). Остальная логика одна.
+- Эталон — numpy-бэкенд (golden генерируются на нём). Расхождение бэкендов
+  на полном `apply`: средняя абсолютная разница ≤ 0.003, максимальная
+  ≤ 0.03 (тест, если cv2 установлен локально).
 
-Каждая стадия — функция `apply(img, params_group, ctx) -> img`, где
-`ctx: StageContext(scale, original_long_edge, warnings)`. Контракт: между
-стадиями изображение передаётся в линейном пространстве; стадия сама
-переводит его в нужное пространство и обратно. Оптимизация «конвертировать
-только на границах групп стадий» допустима, если golden-тесты не меняются.
+### 2.4. Пайплайн
 
-Обозначения ниже: `x` — перцептивное значение 0..1, `s(t) = sin(πt)²`,
-`smoothstep(a,b,x)` — стандартный (с клампингом), `clamp01`,
-`gaussian(img, sigma)` — `cv2.GaussianBlur` с `ksize=(0,0)`.
+`_render(img_linear, P, *, scale, original_long_edge) -> (image, warnings, applied_upright)`
+— внутренняя функция; публичный вход — `apply()` (2.7).
 
-#### 2.4.1. Шумоподавление (`noise.py`)
+`scale` = длинная сторона обрабатываемого / длинная сторона оригинала. Все
+пиксельные радиусы (NR, шарпинг, clarity, texture, dehaze, зерно) заданы для
+оригинала и умножаются на `scale`, чтобы превью и экспорт выглядели
+одинаково.
 
-- Luminance (`luminance > 0`), `L = luminance/100`: перевести перцептивный
-  RGB в YCrCb (`cv2.cvtColor`, float32). К Y:
-  `Y_den = cv2.bilateralFilter(Y, d=0, sigmaColor=0.02 + 0.10*L, sigmaSpace=(1 + 4*L)*scale)`;
+Порядок стадий фиксирован; стадия с нейтральными параметрами пропускается
+без вычислений:
+
+| # | Стадия | Пространство |
+|---|--------|--------------|
+| 1 | Шумоподавление | перцептивное |
+| 2 | Геометрия: дисторсия + ХА + transform + crop (одна выборка); коррекция виньетирования объектива | линейное |
+| 3 | Баланс белого | линейное |
+| 4 | Экспозиция | линейное |
+| 5 | Whites/Blacks → Highlights/Shadows → Contrast | перцептивная luma |
+| 6 | Dehaze → Clarity → Texture | перцептивное |
+| 7 | Tone Curve: master, затем R/G/B | перцептивное |
+| 8 | HSL / Color Mixer | перцептивное (HSV) |
+| 9 | Color Grading | перцептивное |
+| 10 | Vibrance, Saturation | перцептивное |
+| 11 | Локальные коррекции | по параметру |
+| 12 | Шарпинг | перцептивная luma |
+| 13 | Виньетка (post-crop) | см. 2.4.13 |
+| 14 | Зерно | перцептивное |
+
+**Почему порядок отличается от «WB → тон → кривая → HSL → детали → оптика →
+эффекты → маски»:** NR — до тональных операций (иначе поднятые тени
+усиливают шум); геометрия — раньше всего, чтобы виньетка и зерно ложились
+на финальный кадр, а маски задавались в его координатах; локальные
+коррекции — до шарпинга и эффектов (как в LR).
+
+Между стадиями изображение передаётся в линейном пространстве; стадия сама
+конвертирует. Оптимизация «конвертировать на границах групп» допустима,
+если golden-тесты не меняются.
+
+Обозначения: `x` — перцептивное значение, `s(t) = sin(πt)²`, `smoothstep`
+с клампингом, `clamp01`, `G(img, σ)` = `_gaussian`.
+
+#### 2.4.1. Шумоподавление
+
+- Luminance (`L = luminance/100 > 0`): перцептивный RGB → Y, Cb, Cr
+  (BT.601 full range). К Y:
+  `Y_den = _guided_filter(Y, Y, r=max(1, round((1 + 4*L)*scale)), eps=(0.02 + 0.10*L)**2)`;
   `Y' = lerp(Y_den, Y, 0.5*luminance_detail/100)`;
-  `Y' += (luminance_contrast/100) * 0.25 * (Y - gaussian(Y, 2*scale))`.
-- Color (`color > 0`), `sigma = (color/100)*8*scale`: для каналов Cr, Cb
-  `blur = gaussian(c, sigma)`; при `color_smoothness > 0` —
-  `blur = lerp(blur, gaussian(c, 2*sigma), color_smoothness/100*0.5)`;
-  `c' = lerp(blur, c, 0.5*color_detail/100)`.
-- sigma < 0.3 → соответствующий шаг пропускается.
+  `Y' += (luminance_contrast/100) * 0.25 * (Y - G(Y, 2*scale))`.
+- Color (`color > 0`), `σ = (color/100)*8*scale`: для Cb, Cr
+  `b = G(c, σ)`; при `color_smoothness > 0` —
+  `b = lerp(b, G(c, 2σ), color_smoothness/100*0.5)`;
+  `c' = lerp(b, c, 0.5*color_detail/100)`.
 
-#### 2.4.2. Геометрия (`geometry.py`)
+#### 2.4.2. Геометрия
 
-Один вызов `cv2.remap` на канал (каналы отдельно ради ХА), интерполяция
-`INTER_CUBIC` при `scale == 1`, иначе `INTER_LINEAR`;
-`borderMode=BORDER_CONSTANT`, значение 0. Результат клампится снизу к 0
-(cubic даёт отрицательные выбросы).
+Обратное отображение: для каждого пикселя выхода вычисляется точка
+источника; выборка `_sample_bilinear` по каждому каналу (R и B — со своими
+картами из-за ХА), фон 0; результат клампится снизу к 0. Alpha (если есть)
+проходит ту же выборку по карте G.
 
-Обратное отображение для каждого пикселя выхода `p_out`:
-
-1. Нормированные координаты: центр кадра = (0,0), половина диагонали = 1.
-2. Crop: `p_out` переводится в координаты некадрированного кадра
-   (масштаб/смещение по прямоугольнику crop, поворот на `crop.angle` вокруг
-   центра прямоугольника). Размер выхода = размер прямоугольника crop в
-   пикселях.
-3. Transform: `p = H⁻¹ · p`, где `H` — композиция (в порядке применения к
+1. Нормированные координаты: центр (0,0), половина диагонали = 1.
+2. Crop: выход = прямоугольник crop (в пикселях), координаты переводятся в
+   некадрированный кадр (масштаб/смещение, поворот на `crop.angle` вокруг
+   центра прямоугольника).
+3. Transform: `p = H⁻¹·p`, `H` — композиция (в порядке применения к
    изображению): vertical, horizontal, rotate, aspect, scale, offset.
-   - vertical `v`: гомография по 4 углам (`cv2.getPerspectiveTransform`):
-     верхняя кромка растягивается по ширине относительно центра с
-     множителем `k = 1 + 0.4*v/100`, нижняя без изменений.
-   - horizontal `h`: аналогично, правая кромка по высоте, `k = 1 + 0.4*h/100`.
-   - rotate: поворот на `rotate` градусов против часовой стрелки вокруг центра.
+   Гомографии 3×3 считаются в numpy (система 8×8 через `np.linalg.solve`
+   по 4 парам углов).
+   - vertical `v`: верхняя кромка растягивается по ширине относительно
+     центра с множителем `k = 1 + 0.4*v/100`, нижняя без изменений.
+   - horizontal `h`: правая кромка по высоте, `k = 1 + 0.4*h/100`.
+   - rotate: на `rotate` градусов против часовой вокруг центра.
    - aspect `a`: `sx = 1 + a/200`, `sy = 1 - a/200`.
-   - scale: `sx *= scale/100`, `sy *= scale/100`.
-   - offset: сдвиг на `offset_x/100 * W/2`, `offset_y/100 * H/2`.
-   - `constrain=True`: бинарным поиском (20 итераций, множитель 1.0..3.0)
-     подобрать дополнительный масштаб, при котором 4 угла и 4 середины
-     кромок выхода после обратного отображения (включая дисторсию)
-     попадают внутрь источника. Если ×3.0 не хватает →
-     `GeometryError("transform too strong")`.
-4. Дисторсия: `r_s = r * (1 + k1 * r²)`, `k1 = -0.25 * distortion/100`.
-5. ХА (только R и B): радиус дополнительно умножается на
-   `mR = 1 + 0.02 * red_cyan/100` и `mB = 1 + 0.02 * blue_yellow/100`
-   (до ±2% на краю). При `remove=True` `mR`, `mB` подбираются автоматически
-   (ручные значения игнорируются): для каждого канала перебор множителя
-   в [0.995, 1.005] шагом 0.0005; критерий — максимум корреляции модуля
-   градиента канала с модулем градиента G по кольцу r ∈ [0.6, 1.0] на копии
-   с длинной стороной 1024.
+   - scale: `sx, sy *= scale/100`.
+   - offset: сдвиг на `offset_x/100*W/2`, `offset_y/100*H/2`.
+   - `constrain=True`: бинарный поиск (20 итераций, множитель 1.0..3.0)
+     доп. масштаба, при котором 4 угла и 4 середины кромок выхода после
+     обратного отображения (с дисторсией) лежат внутри источника; не хватает
+     ×3.0 → `GeometryError("transform too strong")`.
+4. Дисторсия: `r_s = r*(1 + k1*r²)`, `k1 = -0.25*distortion/100`.
+5. ХА: радиус R умножается на `mR = 1 + 0.02*red_cyan/100`, B — на
+   `mB = 1 + 0.02*blue_yellow/100`. При `remove=True` ручные значения
+   игнорируются, `mR`, `mB` подбираются перебором в [0.995, 1.005] шагом
+   0.001 по максимуму корреляции модуля градиента канала с модулем
+   градиента G в кольце r ∈ [0.6, 1.0] на копии ≤ 1024 px.
 6. Перевод в пиксельные координаты источника.
 
-Коррекция виньетирования объектива (после remap, линейное пространство):
-`gain = 1 + (vignetting/100) * smoothstep(m, 1.0, r)`,
-`m = 0.8 * vignetting_midpoint/100`, `r` — нормированный радиус выхода;
-`img *= gain`.
+Коррекция виньетирования объектива (после выборки, линейно):
+`img *= 1 + (vignetting/100)*smoothstep(0.8*vignetting_midpoint/100, 1.0, r)`.
 
-#### 2.4.3. Авто-горизонт и вертикали (`geometry_detect.py`)
+#### 2.4.3. Авто-горизонт и вертикали (`detect_upright`)
 
-`detect_upright(img_linear, mode: Literal["level","vertical"]) -> dict`
-с ключами `rotate: float, vertical: int, confidence: float, lines_used: int`.
+Без Hough (numpy-only), по ориентациям градиентов:
 
-- Копия с длинной стороной 1024 px, перцептивная luma, Гаусс sigma=1,
-  `cv2.Canny` (пороги 50/150 на uint8), `cv2.HoughLinesP`
-  (`rho=1, theta=π/360, threshold=80, minLineLength=0.05*diag, maxLineGap=0.01*diag`).
-- `level`: линии с |α| < 20° к горизонтали; `rotate = -weighted_median(α)`,
-  вес = длина линии. Если таких линий < 3 — линии с |α−90°| < 20°, угол
-  отклонения от вертикали. Клампинг ±10°.
-  `confidence = min(1, суммарная длина использованных линий / (2*diag))`.
-- `vertical`: сначала `level`; затем перебор `v ∈ [-100..100]` шагом 2:
-  применить гомографию vertical (2.4.2) к концам почти-вертикальных линий
-  (|α−90°| < 25°), минимизировать дисперсию их углов.
-- Если `lines_used < 3` → `confidence = 0`, `rotate = 0`, `vertical = 0`,
-  предупреждение `"upright: not enough lines"`.
-- В пайплайне при `transform.upright != "off"` `detect_upright` вызывается
-  на входном изображении **до** геометрии; найденные значения
-  **прибавляются** к ручным `rotate`/`vertical` (с клампингом) и
-  возвращаются в `RenderResult.applied_upright`.
+- Копия ≤ 1024 px, перцептивная luma, `G(·, 1)`, градиенты Собеля `gx, gy`,
+  модуль `m`; пиксели с `m` выше 90-го перцентиля — «краевые». Ориентация
+  края `α = atan2(gy, gx) + 90°`, приведённая к (-90°, 90°].
+- `level`: края с |α| < 20° (почти горизонтальные). Если их суммарный вес
+  `Σm` < 0.5% от `Σm` всех краевых — берутся почти вертикальные
+  (|α ∓ 90°| < 20°) и их отклонение от вертикали.
+  `rotate = -weighted_median(α, m)`, клампинг ±10°.
+- `vertical`: сначала поправка `level`. Для почти вертикальных краёв
+  (отклонение от вертикали δ, |δ| < 25°) взвешенным МНК оценивается наклон
+  `c` зависимости `δ` от нормированной x-координаты (сходящиеся вертикали
+  дают линейную зависимость). Затем перебор `v ∈ [-100..100]` шагом 2:
+  через гомографию vertical(v) прогоняются 9 синтетических вертикальных
+  отрезков (x = -0.8..0.8, на всю высоту), по ним считается наклон `c(v)`;
+  выбирается `v` с минимальным `|c(v) + c|`.
+- `confidence = min(1, Σm_использованных / (0.02 * Σm_всех_пикселей))`;
+  если использованных краевых пикселей < 200 → `confidence = 0`, значения 0,
+  предупреждение `"upright: not enough edges"`.
+- В пайплайне при `transform.upright != "off"` вызов делается по входу до
+  геометрии; найденное **прибавляется** к ручным `rotate`/`vertical`
+  (с клампингом) и возвращается в `applied_upright`.
 
-#### 2.4.4. Баланс белого (`wb.py`)
+#### 2.4.4. Баланс белого
 
-Линейное пространство, поканальные множители:
 `gR = 2^(0.35*temp/100)`, `gB = 2^(-0.35*temp/100)`, `gG = 2^(-0.35*tint/100)`;
-затем `g /= (0.2126*gR + 0.7152*gG + 0.0722*gB)` (серый сохраняет яркость).
-Для RAW as-shot WB камеры применяется при декодировании (2.6), затем —
-этот относительный сдвиг.
+`g /= (0.2126*gR + 0.7152*gG + 0.0722*gB)`; `rgb *= g` (линейно).
 
-#### 2.4.5. Экспозиция и тон (`tone.py`)
+#### 2.4.5. Экспозиция и тон
 
-- Exposure: `img *= 2^exposure` (линейно).
-- На перцептивной luma `x = OETF(Y)` последовательно:
-  - whites `w = whites/100`: `x += 0.2 * w * min(x,1)^4`
-  - blacks `b = blacks/100`: `x += 0.2 * b * (1 - min(x,1))^4`
-  - highlights `h = highlights/100`: `t = clamp01((x-0.5)/0.5)`, `x += 0.12 * h * s(t)`
-  - shadows `sh = shadows/100`: `t = clamp01(x/0.5)`, `x += 0.12 * sh * s(t)`
-  - contrast `a = 0.5*contrast/100`: для x ∈ [0,1] `x = x - a * sin(2πx)/(2π)`;
-    x > 1 не меняется.
-  - итог: `x' = max(x, 0)`.
+- `rgb *= 2^exposure`.
+- На `x = OETF(Y)` последовательно:
+  - whites: `x += 0.2*(whites/100)*min(x,1)^4`
+  - blacks: `x += 0.2*(blacks/100)*(1 - min(x,1))^4`
+  - highlights: `t = clamp01((x-0.5)/0.5)`, `x += 0.12*(highlights/100)*s(t)`
+  - shadows: `t = clamp01(x/0.5)`, `x += 0.12*(shadows/100)*s(t)`
+  - contrast: для x ∈ [0,1] `x -= 0.5*(contrast/100)*sin(2πx)/(2π)`
+  - `x' = max(x, 0)`.
 - Все функции монотонны на [0,1] во всём диапазоне параметров (тест).
-- Применение с сохранением оттенка: `Y' = EOTF(x')`,
-  `rgb *= Y' / max(Y, 1e-6)`.
-- Highlights/Shadows — **глобальные поточечные** операции, в отличие от
-  локально-адаптивных в LR. Осознанное упрощение: стадия полностью
-  представима в LUT. Фиксируется в README.
+- `rgb *= EOTF(x') / max(Y, 1e-6)`.
+- Highlights/Shadows — глобальные поточечные (в LR — локально-адаптивные).
+  Осознанное упрощение ради представимости в LUT; фиксируется в README и
+  в `reference.md`.
 
-#### 2.4.6. Presence: Dehaze, Clarity, Texture (`presence.py`)
+#### 2.4.6. Dehaze, Clarity, Texture
 
-Пространственные операции (в LUT не переносятся), перцептивное пространство.
+Перцептивное пространство, в LUT не переносятся.
 
 - Dehaze `d = dehaze/100`:
-  - `d > 0`: dark channel = min по каналам → `cv2.erode` квадратным ядром
-    `max(3, round(15*scale))`; атмосферный свет `A` (RGB) = среднее по
-    пикселям из верхних 0.1% dark channel; `t = 1 - 0.95 * dark / max(A)`,
-    сгладить `cv2.blur` ядром `max(3, round(40*scale))`, `t = max(t, 0.1)`;
-    `J = (I - A)/t + A`; результат `max(lerp(I, J, d), 0)`.
-  - `d < 0`: `k = 0.4*|d|`, `a` = средняя перцептивная luma верхних 1%
-    пикселей; `I' = I*(1-k) + a*k`.
-- Clarity `c = clarity/100`, перцептивная luma `l`:
-  `detail = l - gaussian(l, 0.008*original_long_edge*scale)`;
-  `Δ = 0.8 * c * detail * 4*l*(1-l)`; `rgb += Δ` (на каждый канал).
-- Texture `tx = texture/100`: `detail` с `sigma = 0.002*original_long_edge*scale`,
-  `Δ = 0.6 * tx * detail`, без весовой функции по тону.
+  - `d > 0`: dark channel = min по каналам на копии, уменьшенной в 4 раза,
+    → `_min_filter` с нечётным `k = max(3, round(15*scale/4))`; `A` (RGB) —
+    среднее входа по пикселям верхних 0.1% dark channel;
+    `t = 1 - 0.95*dark/max(A)`, `t = _box(t, max(1, round(10*scale/4)))`,
+    увеличение до полного размера, `t = max(t, 0.1)`;
+    `J = (I - A)/t + A`; `I' = max(lerp(I, J, d), 0)`.
+  - `d < 0`: `k = 0.4*|d|`, `a` — средняя `l` по верхнему 1% пикселей;
+    `I' = I*(1-k) + a*k`.
+- Clarity: `detail = l - G(l, 0.008*original_long_edge*scale)`;
+  `rgb += 0.8*(clarity/100)*detail*4*l*(1-l)`.
+- Texture: `detail` с `σ = 0.002*original_long_edge*scale`;
+  `rgb += 0.6*(texture/100)*detail`.
 
-#### 2.4.7. Tone Curve (`curve.py`)
+#### 2.4.7. Tone Curve
 
-- Интерполяция точек — монотонная кубическая Fritsch–Carlson (PCHIP), без
-  выбросов за 0..255. Реализовать самостоятельно (без scipy).
-- Кривая табулируется в 4096 значений на [0,1]; применение — `np.interp`
-  к каждому каналу перцептивного RGB, предварительно клампированному к [0,1].
-- master применяется к R, G, B; затем `red` к R, `green` к G, `blue` к B.
-- Тождественная кривая → шаг пропускается.
+- Монотонная кубическая интерполяция Fritsch–Carlson (PCHIP), своя
+  реализация; табуляция 4096 значений на [0,1]; применение `np.interp` к
+  каждому каналу перцептивного RGB, клампированного к [0,1].
+- master → R, G, B; затем `red` → R, `green` → G, `blue` → B.
+- Тождественная кривая пропускается.
 
-#### 2.4.8. HSL (`hsl.py`)
+#### 2.4.8. HSL
 
-- Перцептивный RGB (клампированный к [0,1]) → HSV.
-- Центры полос (HSV hue): red 0, orange 30, yellow 60, green 120, aqua 180,
-  blue 240, purple 270, magenta 300. Вес пикселя по полосам — кусочно-
-  линейная интерполяция между двумя соседними центрами по кругу (сумма = 1).
-- Hue: `H' = (H + Σ w_i * hue_i/100 * 30) mod 360`.
-- Saturation: `S' = clamp01(S * (1 + Σ w_i * sat_i/100))`.
-- Luminance: `V' = clamp01(V * (1 + Σ w_i * lum_i/100 * 0.5 * S))`
-  (вес S — нейтральные пиксели не меняются).
+- Перцептивный RGB (клампинг [0,1]) → HSV.
+- Центры полос: red 0, orange 30, yellow 60, green 120, aqua 180, blue 240,
+  purple 270, magenta 300. Веса — кусочно-линейная интерполяция между двумя
+  соседними центрами по кругу (сумма = 1).
+- `H' = (H + Σ w_i*hue_i/100*30) mod 360`;
+  `S' = clamp01(S*(1 + Σ w_i*sat_i/100))`;
+  `V' = clamp01(V*(1 + Σ w_i*lum_i/100*0.5*S))`.
 - HSV → RGB.
 
-#### 2.4.9. Color Grading (`grading.py`)
+#### 2.4.9. Color Grading
 
-- `l` — перцептивная luma; положительный `balance` смещает границу в
-  сторону светов: `l_b = clamp01(l + balance/200)`.
-- `p = 3 - 2*blending/100` (blending 0 → узкие зоны, 100 → широкие).
-- Веса: `w_s = (1 - l_b)^p`, `w_h = l_b^p`, `w_m = max(0, 1 - w_s - w_h)`;
-  для global `w = 1`.
-- Для каждой зоны: `c = hsv2rgb(hue, 1, 1)`, `tint = c - luma(c)`;
-  `rgb += w * (sat/100 * 0.15 * tint + lum/100 * 0.15)`.
-- Результат клампится снизу к 0.
+- `l_b = clamp01(l + balance/200)` (положительный balance — в сторону светов).
+- `p = 3 - 2*blending/100`; `w_s = (1-l_b)^p`, `w_h = l_b^p`,
+  `w_m = max(0, 1 - w_s - w_h)`; global: `w = 1`.
+- Для зоны: `c = hsv2rgb(hue, 1, 1)`, `tint = c - luma(c)`;
+  `rgb += w*(sat/100*0.15*tint + lum/100*0.15)`; затем клампинг снизу к 0.
 
-#### 2.4.10. Vibrance и Saturation (`saturation.py`)
+#### 2.4.10. Vibrance и Saturation
 
-- `l` — перцептивная luma, `S` — HSV-насыщенность.
-- Vibrance `v = vibrance/100`: `k = 1 + v * (1 - S) * skin`, `skin = 0.5`,
-  если HSV hue ∈ [10°, 50°], иначе 1; `rgb = l + (rgb - l) * k`.
-- Saturation: `rgb = l + (rgb - l) * (1 + saturation/100)`; при -100 —
-  R=G=B=l.
-- Результат клампится снизу к 0.
+- Vibrance: `k = 1 + (vibrance/100)*(1 - S)*skin`, `skin = 0.5` для
+  HSV hue ∈ [10°, 50°], иначе 1; `rgb = l + (rgb - l)*k`.
+- Saturation: `rgb = l + (rgb - l)*(1 + saturation/100)` (-100 → R=G=B=l).
+- Клампинг снизу к 0.
 
-#### 2.4.11. Локальные коррекции — раздел 2.8.
+#### 2.4.11. Локальные коррекции — 2.8.
 
-#### 2.4.12. Шарпинг (`sharpen.py`)
+#### 2.4.12. Шарпинг
 
-- Перцептивная luma `l`; `hp = l - gaussian(l, radius*scale)`.
-- Ограничение ореолов: `hp = clamp(hp, -lim, lim)`, `lim = 0.05 + 0.25*detail/100`.
-- Маска краёв: `e` — модуль Собеля от `gaussian(l, 1*scale)`, делённый на
-  его 99-й перцентиль (если перцентиль 0 → `e = 0`);
-  `m = smoothstep(t0, t0 + 0.1, e)`, `t0 = 0.3*masking/100`; при
-  `masking = 0` → `m = 1`.
-- `rgb += (amount/150) * 1.5 * hp * m` (на каждый канал).
+- `hp = l - G(l, radius*scale)`; `hp = clamp(hp, -lim, lim)`,
+  `lim = 0.05 + 0.25*detail/100`.
+- Маска краёв: `e = _sobel_mag(G(l, scale))` / его 99-й перцентиль (0 → e=0);
+  `m = smoothstep(t0, t0 + 0.1, e)`, `t0 = 0.3*masking/100`; masking=0 → m=1.
+- `rgb += (amount/150)*1.5*hp*m`.
 
-#### 2.4.13. Виньетка post-crop и зерно (`effects.py`)
+#### 2.4.13. Виньетка и зерно
 
-- Виньетка. Координаты нормируются так, что эллипс по пропорциям кадра
-  проходит через углы при `r = 1`. `roundness`: 0 — эллипс по пропорциям
-  кадра; +100 — круг, проходящий через углы; -100 — супер-эллипс с
-  показателем 4 по пропорциям кадра; промежуточные значения — линейная
-  интерполяция расстояний. Маска
-  `m = smoothstep(m0, m0 + (1 - m0) * (0.05 + 0.95*feather/100), r)`,
+- Виньетка. Нормировка: эллипс по пропорциям кадра проходит через углы при
+  `r = 1`. `roundness`: 0 — эллипс кадра; +100 — круг через углы; -100 —
+  супер-эллипс с показателем 4 по пропорциям кадра; промежуточные —
+  линейная интерполяция расстояний.
+  `m = smoothstep(m0, m0 + (1-m0)*(0.05 + 0.95*feather/100), r)`,
   `m0 = 0.9*midpoint/100`.
-  - `highlight_priority` (линейное пространство): `f = 2^(1.5 * amount/100 * m)`;
-    при amount < 0: `f = lerp(f, 1, smoothstep(0.7, 1.0, Y) * highlights/100)`;
+  - `highlight_priority` (линейно): `f = 2^(1.5*amount/100*m)`; при
+    amount < 0 `f = lerp(f, 1, smoothstep(0.7, 1.0, Y)*highlights/100)`;
     `rgb *= f`.
-  - `color_priority` (перцептивное, сохраняет оттенок):
-    `l' = l + 0.6 * amount/100 * m * (l if amount < 0 else 1 - l)`,
-    `rgb *= l' / max(l, 1e-6)`.
-  - `paint_overlay` (перцептивное):
-    `rgb = lerp(rgb, 0 if amount < 0 else 1, 0.8 * |amount|/100 * m)`.
-- Зерно (перцептивное): `rng = np.random.default_rng(seed)`; монохромный
-  шум `N(0,1)` на сетке `(ceil(H/k), ceil(W/k))`,
-  `k = max(1, (1 + 3*size/100) * scale)`, апсемпл до (H, W) `INTER_CUBIC`
-  → `n1`; второй октав с `max(1, k/2)` → `n2`; `r = roughness/100`,
-  `n = (1-r)*n1 + r*n2`, нормировать на std = 1;
-  `rgb += n * 0.08 * amount/100 * (0.5 + 2*l*(1-l))`.
-  Одинаковые `seed`, параметры и размер → побитно одинаковый результат.
+  - `color_priority` (перцептивно):
+    `l' = l + 0.6*amount/100*m*(l if amount<0 else 1-l)`; `rgb *= l'/max(l,1e-6)`.
+  - `paint_overlay`: `rgb = lerp(rgb, 0 if amount<0 else 1, 0.8*|amount|/100*m)`.
+- Зерно: `rng = np.random.default_rng(seed)`; монохромный `N(0,1)` на сетке
+  `(ceil(H/k), ceil(W/k))`, `k = max(1, (1 + 3*size/100)*scale)`, увеличение
+  `_resize(..., BICUBIC)` → `n1`; второй октав с `max(1, k/2)` → `n2`;
+  `n = (1-r)*n1 + r*n2`, `r = roughness/100`, нормировка std = 1;
+  `rgb += n*0.08*amount/100*(0.5 + 2*l*(1-l))`. Детерминированно.
 
-#### 2.4.14. Кодирование результата
+#### 2.4.14. Кодирование
 
-Клампинг [0,1], OETF, квантование `np.rint` в uint8 (JPEG/PNG/WebP) или
-uint16 (TIFF16/PNG16).
+Клампинг [0,1], OETF, `np.rint` в uint8 или uint16.
 
-### 2.5. Производительность и память
+### 2.5. Производительность
 
-- Превью: длинная сторона `PHOTOGRADE_PREVIEW_PX` (по умолчанию 1600),
-  ресайз `cv2.INTER_AREA` в линейном пространстве.
-- Цели: превью 1600 px со всеми глобальными стадиями ≤ 1.5 с на 4-ядерном
-  CPU; полный рендер 24 Мп ≤ 20 с, пиковая память ≤ 3 ГБ (float32 RGB
-  24 Мп ≈ 290 МБ на буфер; промежуточные буферы освобождать).
-- Лимит входа `PHOTOGRADE_MAX_MP` (по умолчанию 60 Мп), больше →
-  `ImageTooLargeError`.
-- Проверки производительности — тесты с маркером `slow`, в обязательный
-  прогон не входят.
+Целевые значения (numpy-бэкенд, локальная машина 4 ядра; скорость
+песочницы неизвестна — поэтому запас до лимита 45 с):
 
-### 2.6. Ввод/вывод (`io.py`)
+- превью 1024 px, лук `twin_peaks`: ≤ 3 с;
+- экспорт 4096 px, лук `twin_peaks` (без масок и геометрии): ≤ 25 с;
+- `match_reference`: ≤ 10 с;
+- пиковая память при 4096 px: ≤ 1.5 ГБ.
 
-`load_image(path) -> LoadedImage` (dataclass):
-`linear: np.ndarray (H,W,3) float32`, `alpha: np.ndarray | None` (float32 0..1),
-`source_format: str`, `bit_depth: int`, `is_raw: bool`, `exif: bytes | None`,
-`icc_converted_from: str | None`, `warnings: list[str]`, `path: Path`.
+Если цель не достигается — оптимизировать (меньше копий, вычисления на
+уменьшенных картах для dehaze/upright), а не повышать лимиты. Результаты
+замеров — в описание PR.
 
-- Ориентация EXIF применяется при загрузке (`ImageOps.exif_transpose`);
-  при сохранении тег Orientation = 1.
-- ICC: функция `_is_srgb_profile(icc_bytes: bytes) -> bool` — описание
-  профиля (`ImageCms.getProfileDescription`) содержит `"sRGB"`
-  (регистронезависимо). 8-битное изображение со встроенным профилем, для
-  которого она возвращает False (Display P3, Adobe RGB) → конвертация в
-  sRGB через `ImageCms.profileToProfile` (intent perceptual),
-  предупреждение `"converted from <описание> to sRGB"`. 16 бит с не-sRGB
-  профилем — профиль игнорируется, предупреждение
-  `"16-bit ICC profile ignored, treated as sRGB"`. Нет профиля — sRGB без
-  предупреждения.
-- 16-битные TIFF/PNG читаются `cv2.imread(..., IMREAD_UNCHANGED)`
-  (BGR(A) → RGB(A)), 8-битные — Pillow.
-- Grayscale → RGB. CMYK → RGB (Pillow `convert`) с предупреждением.
-  Многокадровые файлы → первый кадр + предупреждение.
-- Alpha хранится отдельно и прикрепляется при сохранении в PNG/TIFF; при
-  сохранении в JPEG — отбрасывается с предупреждением. Геометрия (2.4.2)
-  применяется и к alpha тем же remap (без ХА).
-- RAW (расширения `.cr2 .cr3 .nef .arw .raf .dng .orf .rw2 .pef .srw`,
-  регистронезависимо): без `rawpy` →
-  `UnsupportedFormatError("RAW support requires: pip install photograde[raw]")`.
-  Иначе `rawpy.imread(path).postprocess(use_camera_wb=True, no_auto_bright=True,
-  output_bps=16, gamma=(1, 1), output_color=rawpy.ColorSpace.sRGB)` → /65535
-  → linear. EXIF для RAW не переносится (предупреждение). Поддержка
-  конкретных моделей (в т.ч. CR3) зависит от версии LibRaw в колесе
-  rawpy — фиксируется в README.
-- HEIC/HEIF: при установленном `pillow-heif` регистрируется opener; иначе
-  `UnsupportedFormatError` с подсказкой `photograde[heic]`.
-- Прочие неподдерживаемые расширения → `UnsupportedFormatError`.
-- Повреждённый файл → `CorruptImageError` с исходным сообщением.
-- Пикселей больше лимита → `ImageTooLargeError` (проверка по размеру из
-  заголовка до декодирования, где формат это позволяет).
+### 2.6. Ввод/вывод
 
-`save_image(img_linear, alpha, path, fmt, quality=95, exif=None) -> Path`:
-форматы `jpeg` (8 бит, встроенный sRGB ICC, EXIF сохраняется), `png`
-(8 бит), `png16`, `tiff16` (через `cv2.imwrite`), `webp`. Существующий
-файл не перезаписывается — к имени добавляется `-1`, `-2`, …
+`load(path) -> Photo` (dataclass): `linear` (H,W,3) float32, `alpha`
+(H,W) float32 | None, `path`, `format` (`"JPEG"|"PNG"|"TIFF"`),
+`bit_depth` (8|16), `size` (w,h), `exif: bytes | None`,
+`icc_converted_from: str | None`, `warnings: list[str]`.
 
-### 2.7. Инструменты агента
+- Поддерживаемые форматы: JPEG, PNG, TIFF (по содержимому, не по
+  расширению). Прочие (включая RAW, HEIC, WebP) → `UnsupportedFormatError`
+  с подсказкой «send JPEG/PNG/TIFF».
+- Ориентация EXIF применяется (`ImageOps.exif_transpose`); на выходе
+  Orientation = 1.
+- ICC: `_is_srgb_profile(icc_bytes)` — описание профиля
+  (`ImageCms.getProfileDescription`) содержит `"sRGB"`. 8-битное с не-sRGB
+  профилем → `ImageCms.profileToProfile` в sRGB (intent perceptual) +
+  предупреждение `"converted from <описание> to sRGB"`. Если `ImageCms`
+  недоступен (Pillow без littleCMS) — профиль игнорируется с
+  предупреждением.
+- Режимы Pillow: `L`, `LA`, `P` → RGB(A); `CMYK` → RGB с предупреждением;
+  `I;16*` (16-бит grayscale) → поддерживается Pillow напрямую.
+- 16-бит RGB(A) PNG/TIFF: Pillow такие файлы корректно не читает. Если
+  `_BACKEND == "cv2"` → `cv2.imread(path, IMREAD_UNCHANGED)`
+  (BGR(A) → RGB(A)); иначе
+  `UnsupportedFormatError("16-bit RGB requires OpenCV in this environment; please send an 8-bit JPEG/PNG/TIFF")`.
+  Признак 16-бит RGB определяется по заголовку до декодирования (PNG —
+  bit depth в IHDR, TIFF — тег BitsPerSample).
+- Многокадровый TIFF → первый кадр + предупреждение.
+- Повреждённый файл → `CorruptImageError`.
 
-#### 2.7.1. Сессия (`session.py`)
+`save(image, path, *, quality=95, alpha=None, exif=None, strip_gps=True,
+bit_depth=8, warnings=None) -> str`:
 
-- `Session` хранит загруженные фото: `photo_id` = первые 12 hex-символов
-  sha256 содержимого файла. Хранит `LoadedImage`, превью (linear, длинная
-  сторона `PREVIEW_PX`, если оригинал больше) и его `scale`.
-- Рабочая папка `PHOTOGRADE_WORKDIR` (по умолчанию `~/.cache/photograde`),
-  подпапки `previews/`, `exports/`; создаются при старте.
-- LRU на 8 фото; при вытеснении массивы освобождаются.
-- Неизвестный `photo_id` → `UnknownPhotoError("unknown photo_id, call load_photo first")`.
+- `image` — `Result`, `Photo` или массив linear float32. Для `Result`/`Photo`
+  `alpha` и `exif` берутся из объекта, если не переданы явно.
+- Формат — по расширению: `.jpg/.jpeg` → JPEG (8 бит, `quality`,
+  `subsampling=0`, встроенный sRGB ICC из `ImageCms.createProfile("sRGB")`,
+  EXIF сохраняется); `.png` → PNG; `.tif/.tiff` → TIFF (LZW). Иное
+  расширение → `ParamError`.
+- `warnings` — необязательный список, в который функция дописывает
+  предупреждения (функция возвращает только путь).
+- `bit_depth=16`: только PNG/TIFF и только при `_BACKEND == "cv2"`
+  (`cv2.imwrite`); иначе сохраняется 8 бит, в `warnings` — строка
+  `"16-bit output requires OpenCV; saved as 8-bit"`.
+- `strip_gps=True`: из EXIF удаляется GPS IFD (тег 0x8825).
+- Alpha прикрепляется для PNG/TIFF; для JPEG отбрасывается, в `warnings` —
+  `"alpha dropped for JPEG"`.
+- Существующий файл не перезаписывается: суффиксы `-1`, `-2`, …
+- Папка создаётся при необходимости.
 
-#### 2.7.2. MCP-сервер (`mcp_server.py`)
+### 2.7. Публичный Python API
 
-Официальный Python SDK `mcp`, `FastMCP("photograde")`, транспорт stdio,
-`main()` запускает сервер. Каждый инструмент — тонкая обёртка над функцией
-ядра; функции-обработчики устроены так, чтобы их можно было вызвать в
-тестах без запуска процесса. `PhotogradeError` и `ValidationError`
-возвращаются как ошибка инструмента с человекочитаемым текстом, без
-трейсбека.
+Все функции на верхнем уровне модуля. Аргумент `photo` (и `reference`)
+везде принимает `Photo` или путь `str`.
 
-Превью отдаются как MCP `ImageContent` (JPEG, качество 85), чтобы агент
-видел результат.
-
-| Инструмент | Вход | Выход |
+| Функция | Сигнатура | Назначение |
 |---|---|---|
-| `load_photo` | `path: str` | `{photo_id, width, height, format, bit_depth, is_raw, has_alpha, warnings}` + превью |
-| `get_param_schema` | — | JSON Schema ParamSet |
-| `list_looks` | — | `[{id, name, aliases, description}]` |
-| `get_look` | `look_id: str` | `{id, name, description, palette_notes, provenance, params}` |
-| `analyze_image` | `photo_id: str \| None`, `path: str \| None` (ровно одно) | статистика (2.9.1) |
-| `detect_upright` | `photo_id`, `mode: "level" \| "vertical"` | `{rotate, vertical, confidence, lines_used}` |
-| `match_reference` | `photo_id`, `reference_path`, `strength: float = 0.7`, `components: list[str] = ["wb","tone","color","saturation","hsl"]` | `{params, diagnostics, warnings}` |
-| `apply_params` | `photo_id`, `params: dict = {}`, `look_id: str \| None`, `look_amount: float = 1.0` | `{preview_path, params_effective, warnings, applied_upright}` + превью |
-| `compare` | `photo_id`, `params: dict = {}`, `look_id: str \| None`, `look_amount: float = 1.0` | изображение «до \| после» (каждая половина длинной стороной 800, разделитель 4 px белый) |
-| `export` | `photo_id`, `params: dict = {}`, `look_id`, `look_amount`, `formats: list[str]` (из `jpeg`,`tiff16`,`png`,`png16`,`webp`,`xmp`,`cube`; по умолчанию `["jpeg","xmp","cube"]`), `out_dir: str \| None`, `name: str \| None`, `quality: int = 95`, `xmp_target: "rendered" \| "raw" \| None` (None → `raw`, если фото RAW, иначе `rendered`) | `{files: {fmt: path}, mapping_report: {xmp: [...], cube: [...]}, warnings}` |
+| `load` | `load(path) -> Photo` | 2.6 |
+| `analyze` | `analyze(photo_or_array) -> dict` | статистика, 2.9.1 |
+| `list_looks` | `list_looks(path=None) -> list[dict]` | `[{id, name, aliases, description}]`; `path` по умолчанию — `looks.json` рядом с модулем, затем `/mnt/data/looks.json` |
+| `get_look` | `get_look(look_id, path=None) -> dict` | полный лук; нет → `LookNotFoundError` со списком id |
+| `find_look` | `find_look(query, path=None) -> dict \| None` | id → name/aliases без регистра → подстрока |
+| `normalize` | `normalize(params) -> (dict, list[str])` | 2.2 |
+| `compose` | `compose(look=None, amount=1.0, params=None) -> (dict, list[str])` | лук (id или dict) × amount + поверх явные params (2.7.1) |
+| `apply` | `apply(photo, params=None, *, look=None, amount=1.0, max_side=4096) -> Result` | рендер; `max_side=None` — полный размер; изображение меньше `max_side` не увеличивается |
+| `preview` | `preview(photo, params=None, *, look=None, amount=1.0, max_side=1024) -> Result` | то же, быстро |
+| `before_after` | `before_after(photo, params=None, *, look=None, amount=1.0, out_path=None, max_side=1024) -> str` | JPEG «до \| после» бок о бок, разделитель 4 px белый |
+| `diagnose` | `diagnose(before, after) -> dict` | 2.9.3 |
+| `detect_upright` | `detect_upright(photo, mode="level") -> dict` | 2.4.3 |
+| `match_reference` | `match_reference(photo, reference, *, strength=0.7, components=None) -> MatchResult` | 2.9.2 |
+| `export_xmp` | `export_xmp(params, name, path=None, *, include_geometry=False) -> (str, list[str])` | текст + отчёт; при `path` — запись |
+| `parse_xmp` | `parse_xmp(text) -> dict` | 2.12.1 |
+| `export_cube` | `export_cube(params, title, path=None, *, size=33) -> (str, list[str])` | 2.12.2 |
+| `save` | 2.6 | |
+| `process` | `process(input_path, params=None, *, look=None, amount=1.0, out_dir=None, name=None, formats=("jpeg","xmp","cube","before_after"), max_side=4096, quality=95) -> dict` | всё за один вызов (2.7.2) |
+| `schema`, `describe_params` | 2.2 | |
+| `ENGINE_INFO` | 2.1 | |
 
-Итоговый ParamSet при `look_id` + `params` (`looks.compose(look, amount, params)`):
-`blend(look.params, amount)`, поверх — явные значения `params` (глубокое
-слияние по ключам; явные значения побеждают; `local` — конкатенация:
-сначала из лука, потом из params). `amount` вне [0, 1] — клампинг с
-предупреждением. `blend`:
-- числовые поля с нейтралью 0 умножаются на amount (с округлением для
-  int-полей);
-- не масштабируются: `color_grading.*.hue`, `color_grading.blending`,
-  `grain.seed`, `grain.size`, `grain.roughness`, `vignette.midpoint`,
-  `vignette.roundness`, `vignette.feather`, `vignette.highlights`,
-  `vignette.style`, `sharpening.radius/detail/masking`,
-  `noise_reduction.*_detail`, `noise_reduction.color_smoothness`,
-  `lens.vignetting_midpoint`, булевы и строковые поля;
-- `transform.scale` → `round(100 + amount*(v - 100))`;
-- кривые → `y = round(x + amount*(y - x))` поточечно.
-`look_id` не найден → `LookNotFoundError` со списком доступных id.
+`Result` (dataclass): `image` (linear float32), `alpha`, `exif`, `params`
+(полный нормализованный ParamSet), `warnings`, `scale`, `size`,
+`applied_upright`, `source: Photo`.
+`MatchResult` (dataclass): `params`, `diagnostics`, `warnings`.
 
-Имя выходных файлов по умолчанию: `<имя исходника>_<look_id или "graded">.<ext>`.
+#### 2.7.1. `compose`
 
-MCP prompt `grade_photo` отдаёт содержимое `AGENT_GUIDE.md`.
+- `look` — id (строка; ищется через `find_look`, не найден →
+  `LookNotFoundError`) или dict лука; `None` — без лука.
+- `amount` вне [0,1] → клампинг с предупреждением.
+- Масштабирование лука на `amount`: числовые поля с нейтралью 0 умножаются
+  (int — с округлением); **не** масштабируются: `color_grading.*.hue`,
+  `color_grading.blending`, `grain.seed/size/roughness`,
+  `vignette.midpoint/roundness/feather/highlights/style`,
+  `sharpening.radius/detail/masking`, `noise_reduction.*_detail`,
+  `noise_reduction.color_smoothness`, `lens.vignetting_midpoint`, bool и
+  строки; `transform.scale` → `round(100 + amount*(v - 100))`; кривые →
+  `y = round(x + amount*(y - x))` поточечно.
+- Поверх — `params` глубоким слиянием (явные значения побеждают; `local` —
+  конкатенация: сначала лука, потом params).
+- Результат прогоняется через `normalize`; предупреждения объединяются.
 
-#### 2.7.3. CLI (`cli.py`, typer)
+#### 2.7.2. `process`
 
-- `photograde apply IN [--params P.json] [--look ID] [--amount 1.0] [--out OUT] [--format jpeg] [--xmp] [--cube]`
-- `photograde match IN REF [--strength 0.7] -o params.json`
-- `photograde looks` — список луков.
-- `photograde analyze IN` — JSON статистики в stdout.
-- `photograde schema` — JSON Schema в stdout.
+1. `load(input_path)`.
+2. `compose(look, amount, params)`.
+3. `apply(..., max_side=max_side)`.
+4. По `formats`: `"jpeg"|"png"|"tiff"` → `save` в `out_dir` с именем
+   `<name or stem>_<look id or "graded">.<ext>`; `"before_after"` →
+   `before_after` (`..._before_after.jpg`); `"xmp"` →
+   `export_xmp(params, name=<look name or name or "Photograde">)`;
+   `"cube"` → `export_cube`.
+5. `out_dir` по умолчанию: `/mnt/data/photograde_out`, если `/mnt/data`
+   существует, иначе `./photograde_out`.
+6. Возврат: `{"files": {fmt: path}, "params": <полный ParamSet>,
+   "params_changed": <только отличные от нейтральных поля>,
+   "warnings": [...], "report": {"xmp": [...], "cube": [...]},
+   "size": [w, h], "scale": float, "diagnose": diagnose(before, after),
+   "elapsed_s": float}`.
+7. Неизвестный формат в `formats` → `ParamError` (до начала обработки).
 
-Код возврата 0 при успехе, 2 при ошибке валидации параметров, 1 при прочих
-ошибках (сообщение в stderr).
-
-#### 2.7.4. `AGENT_GUIDE.md`
-
-Для агента (на русском, кратко):
-
-1. Порядок: `load_photo` → источник стиля (лук из библиотеки по имени или
-   алиасу; референс от пользователя → `match_reference`; иначе — подобрать
-   параметры по описанию) → `apply_params` → оценить превью → поправить
-   (не более 4 итераций) → `export`.
-2. Не использовать генеративные модели для цветокоррекции.
-3. Правила: не превышать |exposure| 1.5 без явной причины; проверять
-   клиппинг через `analyze_image`; на портретах не уводить `hsl.hue.orange`
-   дальше ±15.
-4. Если запрошенного стиля нет в библиотеке — предложить пользователю
-   приложить референс-кадр; кадры из фильмов/сериалов самостоятельно не
-   скачивать.
-5. В ответе пользователю: ключевые итоговые параметры, пути к файлам,
-   оговорка, что XMP в Lightroom даст похожий, но не идентичный результат,
-   и перечень того, что не перенеслось в XMP/LUT (из `mapping_report`).
-
-### 2.8. Локальные коррекции (`masks.py`, `stages/local.py`)
-
-#### 2.8.1. Модель
+### 2.8. Локальные коррекции
 
 ```
 LocalAdjustment
-  name: str (1..40 символов)
-  mask:
-    components: list[MaskComponent]   # 1..8
-    invert: bool = False
-    opacity: int[0..100] = 100
-  params:
-    exposure: float[-4..4]=0
-    contrast, highlights, shadows, whites, blacks,
-    temp, tint, saturation, texture, clarity, dehaze: int[-100..100]=0
+  name: str (1..40)
+  mask: {components: list[Component] (1..8), invert: bool=False, opacity: int[0..100]=100}
+  params: {exposure: float[-4..4]=0, contrast, highlights, shadows, whites, blacks,
+           temp, tint, saturation, texture, clarity, dehaze: int[-100..100]=0}
 
-MaskComponent — один из (дискриминатор "type"); у всех
-  mode: Literal["add","subtract","intersect"] = "add"
-  - linear_gradient: start: [x,y], end: [x,y]          # доли кадра 0..1
-  - radial: center: [x,y], radius_x, radius_y: float(0..2] (доли ширины/высоты),
-            angle: float[-180..180]=0, feather: int[0..100]=50, inside: bool=True
-  - luminance_range: low: int[0..100], high: int[0..100] (low <= high), feather: int[0..100]=20
-  - color_range: hue: int[0..359], hue_width: int[1..180]=30,
-                 sat_min: int[0..100]=10, feather: int[0..100]=30
-  - brush: strokes: list[{points: list[[x,y]] (1..512), size: float(0..1] (доля длинной стороны),
-                           feather: int[0..100]=50, flow: int[1..100]=100, erase: bool=False}] (1..64)
-  - image: path: str   # grayscale PNG/JPEG
+Component (по "type"), у всех mode: "add"|"subtract"|"intersect" = "add"
+  linear_gradient: start [x,y], end [x,y]                       # доли кадра 0..1; start != end
+  radial: center [x,y], radius_x, radius_y: float(0..2], angle: float[-180..180]=0,
+          feather: int[0..100]=50, inside: bool=True
+  luminance_range: low, high: int[0..100] (low<=high), feather: int[0..100]=20
+  color_range: hue: int[0..359], hue_width: int[1..180]=30, sat_min: int[0..100]=10, feather: int[0..100]=30
+  image: path: str                                              # grayscale-маска
 ```
 
-#### 2.8.2. Построение масок
+Кисти не реализуются: модель, рисующая вслепую по координатам, не даёт
+полезного результата. ИИ-маски (`ai_subject`, `ai_sky`, `ai_person`) —
+фаза 2; в MVP такой `type` → `ParamError` с текстом
+«AI masks are not supported in this version».
 
-- Координаты — в системе **финального кадра** (после геометрии), x вправо,
-  y вниз, 0..1. Маска — float32 (H, W) в [0,1].
-- linear_gradient: `t` — проекция точки на вектор start→end, нормированная
-  на его длину; `m = 1 - smoothstep(0, 1, t)` (1 со стороны start, 0 со
-  стороны end). `start == end` → ошибка валидации.
-- radial: эллиптическое расстояние `d` с учётом `angle` (1 на границе);
-  `f = max(0.01, feather/100)`; `m = 1 - smoothstep(1 - f, 1, d)`;
+Построение (координаты финального кадра, x вправо, y вниз; маска float32
+[0,1]):
+
+- linear_gradient: `t` — проекция на вектор start→end / его длина;
+  `m = 1 - smoothstep(0, 1, t)`.
+- radial: эллиптическое расстояние `d` с учётом `angle`;
+  `f = max(0.01, feather/100)`; `m = 1 - smoothstep(1-f, 1, d)`;
   `inside=False` → `1 - m`.
-- luminance_range: перцептивная luma ×100; трапеция: 1 на [low, high],
-  линейные склоны шириной `feather` по обе стороны (feather 0 — жёсткая
-  граница). Строится по изображению **на входе стадии 11**.
-- color_range: HSV того же изображения; вес по hue — трапеция с плато
-  ±hue_width/2 и склонами шириной `feather/100*hue_width` (по кругу);
-  умножить на `smoothstep(sat_min/100, sat_min/100 + 0.1, S)`.
-- brush: для каждого мазка — float-канва, полилиния толщиной
-  `max(1, round(size*long_edge))` (`cv2.polylines`, для одной точки —
-  `cv2.circle`), затем Гаусс `sigma = size*long_edge*feather/100*0.5`
-  (если > 0.3), умножение на `flow/100`; накопление `m = max(m, stroke)`,
-  для `erase` — `m = m * (1 - stroke)`.
-- image: загрузка, конвертация в L, ресайз к кадру `INTER_LINEAR`, /255;
-  файл не найден → `FileNotFoundError`, не читается → `CorruptImageError`;
-  оба — ошибка инструмента.
-- Комбинация компонентов по порядку: первый — база (его `mode`
-  игнорируется); `add` → `max(m, c)`, `subtract` → `m * (1 - c)`,
-  `intersect` → `m * c`. Затем `invert` (`1 - m`), затем `* opacity/100`.
+- luminance_range: `l*100`; трапеция: 1 на [low, high], линейные склоны
+  шириной `feather` (0 — жёсткая граница). По изображению на входе стадии 11.
+- color_range: HSV того же изображения; по hue — трапеция с плато
+  ±hue_width/2 и склонами `feather/100*hue_width` (по кругу);
+  `× smoothstep(sat_min/100, sat_min/100 + 0.1, S)`.
+- image: Pillow → `L` → ресайз к кадру (BILINEAR) → /255; нет файла →
+  `FileNotFoundError`, не читается → `CorruptImageError`.
+- Комбинация по порядку: первый — база; `add` → `max`, `subtract` →
+  `m*(1-c)`, `intersect` → `m*c`; затем `invert`, затем `*opacity/100`.
 
-#### 2.8.3. Применение (`stages/local.py`)
+Применение: для каждой коррекции `adj` = копия, прогнанная через стадии WB,
+exposure, tone, presence (dehaze/clarity/texture), saturation с её params
+(те же функции); `img = lerp(img, adj, mask)` в линейном пространстве.
+Нейтральные params → пропуск.
 
-Для каждой коррекции по порядку: `adjusted = apply_local_ops(img, params)`
-— на копии прогоняются стадии WB (temp/tint), exposure, tone
-(contrast/highlights/shadows/whites/blacks), presence
-(dehaze/clarity/texture), saturation — теми же функциями и формулами, что и
-глобально; затем `img = lerp(img, adjusted, mask[..., None])` в линейном
-пространстве. Нейтральные params → коррекция пропускается.
+### 2.9. Анализ, перенос стиля, диагностика
 
-**Не входит в MVP (фаза 2):** компоненты `ai_subject`, `ai_sky`,
-`ai_person`, `ai_background` — через интерфейс
-`MaskProvider.predict(img_perceptual, kind) -> np.ndarray` и модели ONNX
-(extra `ai`). В MVP такой `type` → ошибка валидации (не молчаливый пропуск).
+#### 2.9.1. `analyze`
 
-### 2.9. Анализ и перенос стиля по референсу
+На копии ≤ 512 px:
 
-#### 2.9.1. `analyze.py`
+- `luma_percentiles`: p1, p5, p25, p50, p75, p95, p99 (шкала 0..255, 0.1).
+- `clipping`: `{"highlights": доля пикселей с любым каналом ≥ 254/255, "shadows": доля с l ≤ 1/255}`.
+- `zones`: `shadows` (L* < 33), `midtones`, `highlights` (L* > 66) →
+  `{share, L, a, b}`.
+- `mean_chroma`: средний C*.
+- `hue_bands`: для 8 полос `{share, mean_saturation}` (пиксели с S > 0.15,
+  полоса — ближайший центр).
+- `dominant_colors`: `_kmeans` K=5, 10 итераций, seed 0, по ≤ 20000
+  пикселям (выборка с seed 0) в Lab → `[{hex, share}]` по убыванию share.
+- `cast_estimate`: `{a, b}` по пикселям L* 25..75 и C* < 20 (если < 1% —
+  `None`).
+- `summary`: одна строка на английском (например,
+  `"low-key, warm cast, low saturation, 3% clipped highlights"`) по
+  порогам: p50 < 80 → low-key, > 170 → high-key; |cast| > 4 по a или b →
+  warm/cool/green/magenta cast; mean_chroma < 12 → low saturation,
+  > 35 → high saturation; клиппинг > 1% → упоминание.
 
-`analyze(img_linear) -> dict` на копии с длинной стороной 512:
+#### 2.9.2. `match_reference`
 
-- `luma_percentiles`: p1, p5, p25, p50, p75, p95, p99 перцептивной luma
-  (шкала 0..255, округление до 0.1).
-- `clipping`: `{"highlights": доля пикселей с любым каналом ≥ 254/255,
-  "shadows": доля с перцептивной luma ≤ 1/255}`.
-- `zones`: для `shadows` (L* < 33), `midtones`, `highlights` (L* > 66):
-  `{share, L, a, b}` (средние).
-- `mean_chroma`: средний C* (Lab).
-- `hue_bands`: для 8 полос — `{share, mean_saturation}` по пикселям с S > 0.15
-  (полоса пикселя — ближайший центр).
-- `dominant_colors`: 5 цветов `cv2.kmeans` (K=5, 10 итераций,
-  `cv2.setRNGSeed(0)`, `KMEANS_PP_CENTERS`) в Lab → `[{hex, share}]`,
-  сортировка по share.
-- `cast_estimate`: `{a, b}` — средние по пикселям с L* 25..75 и C* < 20
-  (если таких < 1% — `null`).
+Оба изображения ≤ 512 px (для шага 3 — ≤ 128 px). Шаги по `components`
+(по умолчанию все: `wb, tone, color, saturation, hsl`), каждый — на
+источнике с уже применёнными параметрами предыдущих шагов.
 
-#### 2.9.2. `match.py`
+1. `wb`: перебор `temp, tint` (шаг 20 по [-100..100], затем ±20 вокруг
+   лучшего шагом 5); минимум расстояния средних (a*, b*) пикселей
+   L* 25..75; итог `round(found*strength)`.
+2. `tone`: `m(x) = CDF_ref⁻¹(CDF_src(x))` по гистограммам `l` (256 бинов);
+   точки x = 0, 16, 32, 64, 96, 128, 160, 192, 224, 240, 255; кумулятивный
+   максимум; наклон между соседними точками ограничен [0.33, 3.0] (проход
+   слева направо); `y = x + strength*(m(x) - x)`, округление →
+   `tone_curve.master`.
+3. `color`: для зон shadows → highlights → midtones перебор `hue` 0..355
+   шаг 5, `sat` 0..60 шаг 5 в `color_grading` зоны; минимум расстояния
+   средних (a*, b*) зоны; итог `sat = round(sat*strength)`.
+4. `saturation`: `ratio = mean_C(ref)/max(mean_C(src), 1e-3)`;
+   `clamp(round((ratio-1)*100*strength), -60, 60)`.
+5. `hsl`: полосы с долей ≥ 2% у обоих:
+   `saturation[band] = clamp(round((S_ref/S_src/ratio - 1)*100*strength), -50, 50)`,
+   `hue[band] = clamp(round(Δhue/30*100*strength), -50, 50)` (Δhue —
+   циклическая разница средних, [-180, 180]).
 
-`match_reference(src_linear, ref_linear, strength=0.7, components=ALL) -> MatchResult`
-(`params: ParamSet`, `diagnostics: dict`, `warnings: list[str]`).
-
-Оба изображения уменьшаются до длинной стороны 512 (для перебора в шаге 3 —
-до 128). Шаги выполняются последовательно (только перечисленные в
-`components`), каждый — на источнике, к которому применены параметры
-предыдущих шагов (через `render`).
-
-1. `wb`: перебор `temp, tint` (грубо шагом 20 по [-100..100], затем ±20
-   вокруг лучшего шагом 5); цель — минимум евклидова расстояния между
-   средними (a*, b*) пикселей с L* 25..75 у источника и референса.
-   Итог: `temp = round(found_temp * strength)`, `tint = round(found_tint * strength)`.
-2. `tone`: `m(x) = CDF_ref⁻¹(CDF_src(x))` по гистограммам перцептивной luma
-   (256 бинов); выборка в x = 0, 16, 32, 64, 96, 128, 160, 192, 224, 240,
-   255; принудительная монотонность (кумулятивный максимум), ограничение
-   наклона между соседними точками в [0.33, 3.0] (проход слева направо);
-   `y = x + strength*(m(x) - x)`, округление → `tone_curve.master`.
-3. `color`: для каждой зоны перебор `hue` 0..355 шагом 5 и `sat` 0..60
-   шагом 5 в `color_grading` этой зоны; минимум расстояния средних (a*, b*)
-   зоны до референса; порядок зон shadows → highlights → midtones; итог
-   `sat = round(sat * strength)`.
-4. `saturation`: `ratio = mean_C(ref) / max(mean_C(src), 1e-3)`;
-   `saturation = clamp(round((ratio - 1) * 100 * strength), -60, 60)`.
-5. `hsl`: для полос с долей ≥ 2% и у источника, и у референса:
-   `hsl.saturation[band] = clamp(round((S_ref / S_src / ratio - 1) * 100 * strength), -50, 50)`;
-   `hsl.hue[band] = clamp(round(Δhue / 30 * 100 * strength), -50, 50)`, где
-   `Δhue` — циклическая разница средних hue (градусы, в [-180, 180]).
-   Остальные полосы — 0.
-
-- Всегда в `warnings`: `"not estimated: grain, vignette, clarity, sharpening, geometry"`.
-- `diagnostics`: `zone_ab_distance_before`, `zone_ab_distance_after`
-  (среднее по 3 зонам расстояние средних (a*, b*) до референса),
-  `luma_hist_l1_before`, `luma_hist_l1_after` (L1 между нормированными
-  гистограммами luma).
-- Монохромный референс (средний C* < 2) → выполняются только `tone` и
+- Всегда предупреждение `"not estimated: grain, vignette, clarity, sharpening, geometry"`.
+- `diagnostics`: `zone_ab_distance_before/after`, `luma_hist_l1_before/after`.
+- Монохромный референс (средний C* < 2) → только `tone` и
   `saturation = -100`, предупреждение `"reference is monochrome"`.
 - `strength` вне [0,1] → клампинг с предупреждением.
-- Ограничение метода (в README): перенос по статистике переносит и
-  содержание (ночь на референсе → тёмная кривая на дневном фото), поэтому
+- Ограничение метода (в `reference.md`): перенос по статистике переносит
+  и содержание (ночь на референсе → тёмная кривая на дневном фото), поэтому
   `strength` по умолчанию 0.7 и ограничение наклонов.
 
-### 2.10. Библиотека луков (`looks.py`, `looks/*.json`)
+#### 2.9.3. `diagnose`
 
-Формат `looks/<id>.json`:
+`diagnose(before, after)` (Photo/Result/массивы) →
+`{"before": analyze, "after": analyze, "delta": {"median_luma", "mean_chroma",
+"clip_highlights", "clip_shadows"}, "warnings": [...]}`. Предупреждения:
+рост клиппинга светов или теней более чем на 2 п.п.; медиана luma сдвинулась
+более чем на 60; mean_chroma выросла более чем в 2 раза. Нужна, потому что
+модель не обязательно «видит» собственные превью из песочницы (раздел 4).
+
+### 2.10. Библиотека луков (`gpt/looks.json`)
+
+Один JSON-файл: `{"version": 1, "looks": [ ... ]}`, элемент:
 
 ```json
 {
   "id": "twin_peaks",
   "name": "Twin Peaks (1990)",
   "aliases": ["твин пикс", "twin peaks", "линч", "lynch"],
-  "description": "Тёплый плёночный лук ...",
-  "palette_notes": "Насыщенные красные, глубокие хвойные зелёные, янтарный свет ...",
+  "description": "...",
+  "palette_notes": "...",
   "provenance": "Описание составлено по общему восприятию стилистики, кадры не использовались. Значения — стартовая аппроксимация.",
   "params": { "...": "частичный ParamSet" }
 }
 ```
 
-`list_looks()`, `get_look(id)`, `find_look(query) -> Look | None`: точное
-совпадение id, затем регистронезависимое совпадение с name/aliases, затем
-вхождение подстроки запроса в name/aliases. `compose(look, amount, params)` —
-2.7.2.
-
-Стартовый набор (значения — аппроксимации, правятся по итогам визуальной
-проверки пользователем; неуказанные поля — нейтральные). `description` и
-`palette_notes` — по тексту в скобках:
+Стартовый набор (аппроксимации; неуказанные поля нейтральные;
+`description`/`palette_notes` — по тексту в скобках):
 
 1. **twin_peaks** (тёплый плёночный; насыщенные красные, глубокие тёмные
    зелёные, янтарный интерьерный свет, мягкий контраст, приподнятые тёплые
@@ -884,8 +807,8 @@ MaskComponent — один из (дискриминатор "type"); у всех
    `light {contrast 35, highlights -10, shadows -15, whites 15, blacks -25}`,
    `presence {clarity 20, saturation -100}`, `hsl.luminance {red 10, orange 15, blue -20}`,
    `effects {vignette {amount -30, midpoint 35, feather 60}, grain {amount 30, size 30, roughness 60}}`.
-   HSL-luminance (стадия 8) выполняется до saturation -100 (стадия 10),
-   поэтому работает как ч/б-микшер.
+   HSL-luminance (стадия 8) идёт до saturation -100 (стадия 10) и работает
+   как ч/б-микшер.
 7. **warm_film_portrait** (мягкая тёплая плёнка для портретов):
    `white_balance {temp 10, tint 3}`, `light {contrast -10, highlights -25, shadows 15, blacks 10}`,
    `presence {clarity -15, texture -10, vibrance 10, saturation -5}`,
@@ -898,19 +821,106 @@ MaskComponent — один из (дискриминатор "type"); у всех
    `presence {saturation -20, vibrance -10}`, `hsl.saturation {orange -15, yellow -30, green -30}`,
    `color_grading {shadows {hue 210, sat 12}, highlights {hue 200, sat 6}}`.
 
-Каждый файл обязан проходить `normalize_params` без ошибок и без
-предупреждений (тест). Невалидный файл лука при загрузке библиотеки →
-исключение (не пропуск).
+Каждый лук проходит `normalize` без ошибок и предупреждений; id уникальны;
+aliases не пересекаются между луками (тест).
 
-### 2.11. Экспорт Lightroom XMP (`export_xmp.py`)
+### 2.11. Тексты для GPT
 
-`export_xmp(params, name, *, target: Literal["rendered","raw"] = "rendered",
-include_geometry: bool = False) -> tuple[str, list[str]]` — текст XMP и
-`mapping_report` (строки о том, что не перенесено).
-`parse_xmp(text) -> ParamSet` — обратное преобразование для полей таблицы
-(для round-trip-теста и импорта пресетов).
+#### 2.11.1. `gpt/instructions.md` (поле Instructions)
 
-Формат — пресет Lightroom Classic / Camera Raw:
+Жёсткий лимит конструктора — 8000 символов; файл ≤ **7500** символов
+(запас; проверяется тестом и `build_bundle.py`). Язык — русский (ответы
+пользователю на его языке). Обязательное содержание (формулировки — на
+усмотрение Лупы, но все пункты должны присутствовать):
+
+1. **Роль:** колорист-ретушёр, который обрабатывает фото только через
+   движок `photograde.py`; результат — параметрическая обработка, а не
+   перерисовка.
+2. **Старт каждой сессии (первый вызов Python):**
+   ```python
+   import sys, os, glob
+   cands = glob.glob("/mnt/data/**/photograde*.py", recursive=True)
+   sys.path.insert(0, os.path.dirname(cands[0]))
+   import photograde as pg; print(pg.ENGINE_INFO())
+   ```
+   Если файл не найден — попросить пользователя прикрепить `photograde.py`
+   и `looks.json` прямо в чат (они попадут в `/mnt/data`). **Запрещено**
+   переписывать движок или обрабатывать фото собственным кодом.
+3. **Рабочий цикл:**
+   1) посмотреть фото (vision) и вызвать `pg.analyze`;
+   2) определить источник стиля: лук (`pg.find_look`), референс
+      пользователя (`pg.match_reference`), или описание (веб-поиск → словарь
+      из `reference.md`);
+   3) составить ParamSet — только изменённые поля, с коротким обоснованием;
+   4) `pg.process(...)` с `formats=("jpeg","xmp","cube","before_after")`;
+   5) показать «до/после», перечислить ключевые параметры и ссылки на файлы
+      (`sandbox:/mnt/data/...`), пересказать `warnings` и `report` по-русски;
+   6) на правки («теплее», «меньше зерна») — менять текущий ParamSet
+      точечно, а не начинать заново.
+4. **Таймауты/размер:** по умолчанию `max_side=4096`; полный размер — только
+   по просьбе; при таймауте повторить с 3072, затем 2048 и сообщить.
+5. **Веб-поиск:** искать описания цветокоррекции (статьи, интервью
+   операторов, разборы палитры), не кадры; переводить описание в параметры
+   по словарю `reference.md`; называть источник. Не обещать «точно как в
+   фильме» и не копировать чужие кадры; лучший результат — по референсу,
+   который пришлёт пользователь.
+6. **Самопроверка:** `pg.diagnose` (входит в результат `process`) — если
+   есть предупреждения (клиппинг и т.п.), скорректировать до показа; не
+   полагаться только на собственное впечатление о превью.
+7. **Честность:** XMP в Lightroom даст похожий, не идентичный результат;
+   LUT переносит только цвет и тон (см. `report`); RAW/HEIC/WebP не
+   поддерживаются — попросить JPEG/PNG/TIFF; генеративная перерисовка в этой
+   версии не используется.
+8. **Справка:** за деталями параметров, словарём стилей и примерами кода —
+   `reference.md` в Knowledge; `pg.describe_params()` — список полей.
+
+#### 2.11.2. `gpt/reference.md` (Knowledge)
+
+Разделы:
+
+1. **Быстрый старт API** — примеры кода: `process` с луком; `process` со
+   своими params; `match_reference` + `process`; точечная правка ParamSet;
+   `before_after`; полный размер. Примеры, которые проверяются тестом,
+   помечаются комментарием `# test` в первой строке блока.
+2. **Параметры** — таблица всех полей (путь, диапазон, что делает визуально,
+   типичные значения), согласованная с `describe_params()`. Пометка об
+   отличиях от LR (2.4.5, 0.2 п.5).
+3. **Словарь «описание → параметры»** (не менее 30 строк), формат строки:
+   описание → поля с направлением и диапазоном. Обязательные строки:
+   - «тёплый / золотистый» → `white_balance.temp` +10..+25;
+   - «холодный / стальной» → `white_balance.temp` -10..-25, `color_grading.shadows.hue` 200..220 при `color_grading.shadows.sat` 10..20;
+   - «бирюзовые тени» → `color_grading.shadows.hue` 180..200, `color_grading.shadows.sat` 15..30;
+   - «teal & orange / тёплая кожа» → `color_grading.highlights.hue` 30..40, `color_grading.highlights.sat` 10..25, `hsl.saturation.orange` +5..+15;
+   - «зелёный каст» → `white_balance.tint` -15..-35, `color_grading.midtones.hue` 110..140;
+   - «выцветшие / молочные чёрные» → первая точка `tone_curve.master` [0, 15..35], `light.blacks` +10..+25;
+   - «задавленные чёрные» → `light.blacks` -15..-40, `light.contrast` +15..+30;
+   - «высокий контраст» → `light.contrast` +20..+45;
+   - «мягкий / плоский» → `light.contrast` -10..-30, `light.highlights` -15..-30, `light.shadows` +10..+25;
+   - «десатурированный» → `presence.saturation` -15..-45; «насыщенный» → `presence.vibrance` +10..+30;
+   - «плёночное зерно» → `effects.grain.amount` 15..35, `effects.grain.size` 20..40;
+   - «виньетка» → `effects.vignette.amount` -15..-35;
+   - «дымка / мягкое свечение» → `presence.dehaze` -10..-30, `presence.clarity` -10..-25;
+   - «ч/б» → `presence.saturation` -100 + `hsl.luminance.*` как ч/б-микшер;
+   - остальные строки Лупа дополняет до ≥ 30 по тем же принципам
+     (направление и диапазон, без «магических» точных значений).
+4. **Работа с референсом пользователя** — `match_reference`, `strength`
+   0.5–0.8, что не переносится, как довести вручную.
+5. **Локальные маски** — примеры: небо (linear_gradient сверху вниз +
+   intersect с luminance_range светлых), лицо (radial по координатам,
+   оценённым по vision), выделение цвета (color_range).
+6. **Ограничения и ошибки** — типичные `ParamError` и как их исправить;
+   16-бит без OpenCV; таймауты.
+7. **Правила по стилям из фильмов/сериалов** — работаем по описанию и по
+   референсу пользователя; кадры не скачиваем и не воспроизводим.
+
+Размер `reference.md` — ≤ 60 000 символов.
+
+### 2.12. Экспорт XMP и LUT
+
+#### 2.12.1. `export_xmp`
+
+Формат — пресет Lightroom Classic / Camera Raw; генерация через
+`xml.etree.ElementTree` (префиксы `x`, `rdf`, `crs`):
 
 ```xml
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Photograde 0.1.0">
@@ -931,295 +941,265 @@ include_geometry: bool = False) -> tuple[str, list[str]]` — текст XMP и
 </x:xmpmeta>
 ```
 
-Генерация через `xml.etree.ElementTree` с регистрацией префиксов `x`,
-`rdf`, `crs`. Числа со знаком форматируются как `+N` / `-N` / `0`;
-exposure — 2 знака после точки (`+0.50`); `SharpenRadius` — 1 знак.
-Пишутся служебные атрибуты и только поля, отличные от нейтральных; кривая
-пишется, если она не тождественная (тогда же `ToneCurveName2012="Custom"`).
-
-Таблица соответствия:
+Числа со знаком: `+N`/`-N`/`0`; exposure — 2 знака (`+0.50`);
+`SharpenRadius` — 1 знак. Пишутся служебные атрибуты и только отличные от
+нейтральных поля; нетождественная кривая → ещё `ToneCurveName2012="Custom"`.
+`parse_xmp(text) -> dict` — обратное преобразование (для round-trip-теста).
 
 | ParamSet | crs-атрибут | Примечание |
 |---|---|---|
-| light.exposure/contrast/highlights/shadows/whites/blacks | `Exposure2012`, `Contrast2012`, `Highlights2012`, `Shadows2012`, `Whites2012`, `Blacks2012` | семантика 1:1, рендер отличается |
-| white_balance.temp/tint | `IncrementalTemperature`, `IncrementalTint` + `WhiteBalance="Custom"` | только `target="rendered"`; для `raw` не пишется, в отчёт: «WB не переносится в RAW-пресет (LR хранит абсолютные K)» |
-| presence.texture/clarity/dehaze/vibrance/saturation | `Texture`, `Clarity2012`, `Dehaze`, `Vibrance`, `Saturation` | 1:1 |
-| tone_curve.master/red/green/blue | `ToneCurvePV2012`, `ToneCurvePV2012Red`, `ToneCurvePV2012Green`, `ToneCurvePV2012Blue` (rdf:Seq из `"x, y"`) | точки 1:1, интерполяция LR отличается |
-| hsl.hue/saturation/luminance[color] | `HueAdjustment<Color>`, `SaturationAdjustment<Color>`, `LuminanceAdjustment<Color>`; Color ∈ Red, Orange, Yellow, Green, Aqua, Blue, Purple, Magenta | 1:1 |
+| light.* | `Exposure2012`, `Contrast2012`, `Highlights2012`, `Shadows2012`, `Whites2012`, `Blacks2012` | семантика 1:1, рендер отличается |
+| white_balance.temp/tint | `IncrementalTemperature`, `IncrementalTint` + `WhiteBalance="Custom"` | для JPEG/TIFF в LR корректно; на RAW в LR поведёт себя иначе (строка в отчёте всегда, если WB не нейтрален) |
+| presence.* | `Texture`, `Clarity2012`, `Dehaze`, `Vibrance`, `Saturation` | |
+| tone_curve.* | `ToneCurvePV2012`, `ToneCurvePV2012Red/Green/Blue` (rdf:Seq `"x, y"`) | интерполяция LR отличается |
+| hsl.* | `HueAdjustment<Color>`, `SaturationAdjustment<Color>`, `LuminanceAdjustment<Color>`; Color ∈ Red, Orange, Yellow, Green, Aqua, Blue, Purple, Magenta | |
 | color_grading shadows/highlights hue, sat | `SplitToningShadowHue`, `SplitToningShadowSaturation`, `SplitToningHighlightHue`, `SplitToningHighlightSaturation` | |
-| color_grading midtones / global | `ColorGradeMidtoneHue/Sat/Lum`, `ColorGradeGlobalHue/Sat/Lum` | |
-| color_grading shadows.lum / highlights.lum | `ColorGradeShadowLum`, `ColorGradeHighlightLum` | |
-| color_grading blending / balance | `ColorGradeBlending`, `SplitToningBalance` | |
+| color_grading midtones/global | `ColorGradeMidtoneHue/Sat/Lum`, `ColorGradeGlobalHue/Sat/Lum` | |
+| color_grading shadows.lum/highlights.lum | `ColorGradeShadowLum`, `ColorGradeHighlightLum` | |
+| color_grading blending/balance | `ColorGradeBlending`, `SplitToningBalance` | |
 | detail.sharpening | `Sharpness`, `SharpenRadius`, `SharpenDetail`, `SharpenEdgeMasking` | |
 | detail.noise_reduction | `LuminanceSmoothing`, `LuminanceNoiseReductionDetail`, `LuminanceNoiseReductionContrast`, `ColorNoiseReduction`, `ColorNoiseReductionDetail`, `ColorNoiseReductionSmoothness` | |
 | lens.distortion | `LensManualDistortionAmount` | |
-| lens.vignetting / vignetting_midpoint | `VignetteAmount`, `VignetteMidpoint` | ручная коррекция объектива |
-| lens.chromatic_aberration.remove | `AutoLateralCA="1"` | ручные red_cyan/blue_yellow не экспортируются (в отчёт) |
-| transform.vertical/horizontal/rotate/aspect/scale/offset_x/offset_y | `PerspectiveVertical`, `PerspectiveHorizontal`, `PerspectiveRotate`, `PerspectiveAspect`, `PerspectiveScale`, `PerspectiveX`, `PerspectiveY` | только при `include_geometry=True` (специфично для кадра); иначе — в отчёт, если не нейтрально |
-| transform.upright | — | не экспортируется; в отчёт: «включите Upright в LR вручную» |
-| crop | `HasCrop="True"`, `CropTop`, `CropLeft`, `CropBottom`, `CropRight`, `CropAngle` | только при `include_geometry=True` |
-| effects.vignette | `PostCropVignetteAmount`, `PostCropVignetteMidpoint`, `PostCropVignetteRoundness`, `PostCropVignetteFeather`, `PostCropVignetteHighlightContrast`, `PostCropVignetteStyle` (1 highlight_priority, 2 color_priority, 3 paint_overlay) | |
+| lens.vignetting/midpoint | `VignetteAmount`, `VignetteMidpoint` | |
+| lens.chromatic_aberration.remove | `AutoLateralCA="1"` | ручные значения — в отчёт |
+| transform.* (кроме upright) | `PerspectiveVertical`, `PerspectiveHorizontal`, `PerspectiveRotate`, `PerspectiveAspect`, `PerspectiveScale`, `PerspectiveX`, `PerspectiveY` | только `include_geometry=True`; иначе в отчёт, если не нейтрально |
+| transform.upright | — | в отчёт: «включите Upright в LR вручную» |
+| crop | `HasCrop="True"`, `CropTop/Left/Bottom/Right/Angle` | только `include_geometry=True` |
+| effects.vignette | `PostCropVignetteAmount/Midpoint/Roundness/Feather/HighlightContrast`, `PostCropVignetteStyle` (1 highlight_priority, 2 color_priority, 3 paint_overlay) | |
 | effects.grain | `GrainAmount`, `GrainSize`, `GrainFrequency` (= roughness) | seed не переносится |
-| local[] | — | **не экспортируются в MVP** (`MaskGroupBasedCorrections` сложен и зависит от версии LR); в отчёт — список имён пропущенных коррекций |
+| local[] | — | не экспортируются; в отчёт — имена коррекций |
 
-Для экспорта лука без фото `name` = `look.name`.
+**Ручная проверка (обязательна, выполняет пользователь):** импорт XMP хотя
+бы одного лука в LR Classic или Camera Raw — пресет открывается, ползунки
+выставлены. При расхождении имён атрибутов правятся таблица ТЗ и код.
 
-**Обязательная ручная проверка (не автотест):** импортировать
-сгенерированный XMP хотя бы одного лука в Lightroom Classic или Camera Raw
-и убедиться, что пресет открывается и ползунки выставлены. Имена атрибутов
-сверить с пресетом, экспортированным из актуальной версии LR; при
-расхождении — исправить таблицу в этом ТЗ и код. Результат проверки —
-в описании PR.
+#### 2.12.2. `export_cube`
 
-### 2.12. Экспорт `.cube` LUT (`export_cube.py`)
+- Вход/выход — sRGB-кодированные [0,1]; решётка `size³` (по умолчанию 33),
+  R меняется быстрее всего, затем G, B. Заголовок `TITLE "<title>"`,
+  `LUT_3D_SIZE 33`, `DOMAIN_MIN 0.0 0.0 0.0`, `DOMAIN_MAX 1.0 1.0 1.0`;
+  значения — 6 знаков после точки.
+- Генерация: решётка → EOTF → поточечные стадии (WB, exposure, tone, tone
+  curve, HSL, color grading, vibrance/saturation) теми же функциями → OETF →
+  клампинг.
+- Отчёт: непереносимые группы, отличные от нейтральных (NR, геометрия,
+  объектив, dehaze, clarity, texture, local, шарпинг, виньетка, зерно);
+  при exposure > 0 или whites > 0 — «values above 1.0 are clipped in LUT».
 
-`export_cube(params, title, size=33) -> tuple[str, list[str]]` — текст и
-`mapping_report`.
+### 2.13. `GUIDE_RU.md` — гайд для пользователя
 
-- Вход/выход LUT — sRGB-кодированные значения [0,1] (display-referred).
-- Решётка `size³`, R меняется быстрее всего, затем G, затем B (стандарт
-  `.cube`). Заголовок: `TITLE "<title>"`, `LUT_3D_SIZE 33`,
-  `DOMAIN_MIN 0.0 0.0 0.0`, `DOMAIN_MAX 1.0 1.0 1.0`. Значения — 6 знаков
-  после точки, разделитель пробел.
-- Генерация: решётка как изображение (size³ × 1 × 3) → EOTF → поточечные
-  стадии с теми же функциями, что в `render`: WB, exposure, tone, tone
-  curve, HSL, color grading, vibrance/saturation → OETF → клампинг [0,1].
-- `mapping_report`: перечень непереносимых групп, отличных от нейтральных:
-  NR, геометрия, коррекция объектива, dehaze, clarity, texture, local,
-  шарпинг, виньетка, зерно.
-- Если exposure > 0 или whites > 0 — строка в отчёт: значения выше 1.0
-  в LUT клампятся.
+Для новичка, по-русски, пошагово, без жаргона. Разделы (заголовки `##`
+с этими номерами и названиями):
 
-### 2.13. Фаза 2 (НЕ реализовывать сейчас — только границы)
+1. Что это и чем это не является (не «плагин ChatGPT», а свой GPT с
+   движком; не генеративная перерисовка; LR-пресет похожий, не идентичный).
+2. Что нужно: аккаунт ChatGPT с возможностью создавать GPT (проверить тариф
+   на сайте OpenAI); файлы из папки `gpt/` (из `dist/photograde-gpt.zip`,
+   если он выложен в релизах репозитория; иначе GitHub → Code → Download
+   ZIP → папка `plugins/photograde/gpt`).
+3. Создание GPT: Explore GPTs → Create → вкладка Configure; имя, описание.
+4. Instructions: открыть `instructions.md`, скопировать весь текст,
+   вставить; убедиться, что конструктор не ругается на длину.
+5. Knowledge: загрузить `photograde.py`, `looks.json`, `reference.md`.
+6. Capabilities: включить Code Interpreter & Data Analysis и Web Search;
+   генерацию изображений можно выключить.
+7. Conversation starters — 4 готовые фразы («Обработай фото в стиле Twin
+   Peaks», «Сделай как на моём референсе», «Покажи список стилей»,
+   «Сделай теплее и добавь зерна»).
+8. Сохранение: «Only me» (рекомендуется) или по ссылке; предупреждение, что
+   файлы Knowledge публичного GPT могут быть доступны пользователям.
+9. Первый тест: прислать JPEG, попросить стиль, скачать файлы (клик по
+   ссылке).
+10. Как применить XMP в Lightroom Classic / Camera Raw и `.cube` в
+    Photoshop (Color Lookup) / DaVinci Resolve.
+11. Частые проблемы: «GPT пишет свой код вместо движка» → фраза «используй
+    photograde.py»; «файл не найден» → прикрепить `photograde.py` и
+    `looks.json` в чат; таймаут → попросить меньший размер; 16-бит/RAW/HEIC
+    → конвертировать в JPEG/PNG; обновление версии → заменить файлы в
+    Knowledge.
 
-- **Генеративный режим** `creative_restyle(photo_id, prompt)` через OpenAI
-  Images API; модель из `PHOTOGRADE_IMAGE_MODEL` (кандидаты
-  `gpt-image-2.5-flare`, `gpt-image-2`); включается только при
-  `PHOTOGRADE_ENABLE_GENERATIVE=1` и `OPENAI_API_KEY`; результат с суффиксом
-  `_GENERATIVE` и полем `generative: true`; XMP/LUT для него не создаются.
-  Параметры эндпоинта и цену сверить с документацией OpenAI в момент
-  реализации.
-- **ИИ-маски** (2.8.3).
-- **HTTP-MCP для ChatGPT Apps** (публичный HTTPS, OAuth, передача файлов).
-- Экспорт линейных/радиальных масок в XMP.
+Скриншоты не обязательны; если добавляются — в `plugins/photograde/docs/img/`,
+без личных данных.
 
-### 2.14. Документация
+### 2.14. Документация разработчика
 
-- `plugins/photograde/README.md`: установка
-  (`pip install -e "plugins/photograde[raw]"`), подключение к Claude Code
-  (`claude mcp add photograde -- photograde-mcp`) и пример `.mcp.json`,
-  список инструментов, ограничения (0.2 п.4, 2.4.5, 2.9.2, 2.11, 2.12),
-  env-переменные (`PHOTOGRADE_WORKDIR`, `PHOTOGRADE_PREVIEW_PX`,
-  `PHOTOGRADE_MAX_MP`), примеры CLI.
-- В конец корневого `README.md` — одна строка:
-  `Плагин обработки фото Photograde — см. plugins/photograde/README.md.`
+- `plugins/photograde/README.md`: назначение, структура,
+  `pip install -e "plugins/photograde[dev]"` (+ `[accel]` для проверки
+  cv2-бэкенда), `pytest`, `PHOTOGRADE_BACKEND=numpy`,
+  `scripts/build_bundle.py`, `scripts/regen_golden.py`, ограничения (0.2,
+  2.4.5, 2.6, 2.9.2, 2.12), ссылка на `GUIDE_RU.md`.
+- В конец корневого `README.md` одна строка:
+  `Photograde — GPT для обработки фото в стилистике: см. plugins/photograde/GUIDE_RU.md.`
+
+### 2.15. Фаза 2 (НЕ реализовывать)
+
+- MCP-сервер (Claude Code/Desktop) и HTTP-MCP для ChatGPT Apps поверх того
+  же `photograde.py`.
+- Генеративный режим gpt-image (`gpt-image-2.5-flare` / `gpt-image-2`),
+  явно помеченный, выключенный по умолчанию.
+- ИИ-маски (ONNX) — в песочнице ChatGPT весов нет и скачать их нельзя,
+  поэтому только для MCP-варианта.
+- Экспорт масок в XMP; RAW через rawpy (только MCP-вариант).
 
 ## 3. Ограничения и зависимости
 
-- Python ≥ 3.11. Без scipy, scikit-image, torch, colour-science.
-- Лицензии зависимостей: numpy (BSD), OpenCV 4.x (Apache-2.0), Pillow
-  (MIT-CMU), pydantic (MIT), typer (MIT), mcp (MIT), rawpy (MIT; LibRaw —
-  LGPL/CDDL).
-- Никаких сетевых вызовов в MVP, никакой загрузки по URL (инструменты
-  принимают только локальные пути).
-- Пути: абсолютные или относительно cwd сервера; чтение только
-  существующих файлов; запись — только в `out_dir` (по умолчанию
-  `PHOTOGRADE_WORKDIR/exports`), `out_dir` создаётся при необходимости.
-- Все операции детерминированы (зерно — через `seed`, k-means —
-  `cv2.setRNGSeed(0)`).
+- Рантайм движка: Python ≥ 3.10, numpy, Pillow, стандартная библиотека;
+  `cv2` — опционально. Без scipy, scikit-image, pydantic, torch.
+- Никаких сетевых вызовов; запись только в `out_dir` и явно переданные пути.
+- Детерминизм: зерно — `seed`; k-means и выборки — seed 0.
+- Сторонний код в модуль не копируется.
 
 ## 4. Риски и цена
 
-- **Деньги:** MVP — 0. Рассуждения и vision выполняет LLM хоста (подписка
-  пользователя), сервер локальный, платных API нет. Фаза 2: генеративный
-  режим — оплата за изображение по тарифу OpenAI (для 2.5 цена при
-  подготовке ТЗ не проверена); ИИ-маски — 0 денег, но +150–400 МБ весов и
-  1–5 с CPU на кадр; ChatGPT Apps — VPS с 2–4 ГБ RAM, HTTPS, OAuth.
-- **Время (оценка):** MVP 7–10 рабочих дней. Разбивка на коммиты:
-  (1) schema, color, io, стадии 3–5, 7–10 + тесты; (2) noise, geometry,
-  presence, sharpen, effects; (3) masks + local; (4) analyze, match, looks,
-  geometry_detect; (5) XMP + LUT; (6) session, MCP, CLI, AGENT_GUIDE,
-  README, golden.
-- **Ожидание «как в Lightroom 1:1»** — рендер отличается. Смягчение:
-  оговорка в README и в ответе агента; XMP даёт пользователю «настоящий»
-  LR-рендер.
-- **Качество луков** — значения подобраны по описанию, не калиброваны по
-  кадрам. Смягчение: `match_reference` по референсу пользователя, итерации
-  агента по превью.
-- **Перенос по статистике переносит содержание** — смягчено `strength` и
-  ограничением наклонов.
-- **Имена crs-атрибутов** могут отличаться в новых версиях LR —
-  обязательная ручная проверка (2.11).
-- **Память на больших файлах** — лимит `PHOTOGRADE_MAX_MP`.
-- **ChatGPT как рантайм** — передача файлов в MCP/Actions там нестабильна;
-  потребуется отдельное ТЗ на HTTP-обёртку, ядро к этому готово.
+- **Деньги:** 0 на инфраструктуру; нужен платный план ChatGPT пользователя
+  (какой минимальный — не проверено).
+- **Время (оценка):** 9–12 рабочих дней (numpy-only дороже варианта с
+  OpenCV: свои Гаусс, guided filter, выборка, k-means, детектор горизонта).
+  Разбивка на коммиты:
+  1. каркас, `PARAM_SPEC`/`normalize`/`schema`, цвет, примитивы, бэкенды + тесты;
+  2. I/O, стадии 3–5, 7–10, `apply`/`preview`/`save`;
+  3. NR, геометрия, upright, presence, шарпинг, эффекты;
+  4. маски и локальные коррекции;
+  5. analyze/diagnose/match_reference, looks.json, compose;
+  6. XMP, LUT, `process`, `before_after`;
+  7. `instructions.md`, `reference.md`, `GUIDE_RU.md`, README, build_bundle, golden, perf.
+- **OpenAI меняет песочницу/лимиты** (версии библиотек, таймауты, доступ к
+  Knowledge из Code Interpreter) — смягчение: минимум зависимостей, поиск
+  модуля через glob, фолбэк «прикрепить файл в чат», консервативный
+  `max_side`.
+- **GPT игнорирует движок и пишет свой код** (известное поведение) —
+  смягчение: жёсткое правило в Instructions, `process()` в один вызов,
+  пункт в гайде, пункт в живой приёмке.
+- **Баг-репорт «Code Interpreter не работает у не-авторов GPT с
+  Knowledge-файлами»** — для приватного GPT пользователя некритично;
+  фолбэк — прикрепить файлы в чат.
+- **Качество зависит от vision-оценки модели** и её перевода описаний в
+  числа; модель может не видеть собственные превью из песочницы —
+  смягчение: `diagnose`, словарь в `reference.md`, «до/после» для
+  пользователя, итерации по его отзыву.
+- **Таймаут на больших фото** — `max_side=4096` по умолчанию, ступенчатое
+  снижение.
+- **Ожидание «как в LR 1:1» / «точно как в сериале»** — оговорки в
+  инструкциях и гайде.
+- **Имена crs-атрибутов** — ручная проверка импорта.
+- **Приёмку в живом GPT может сделать только пользователь** — Лупа
+  отвечает за локальные тесты, пользователь — за чек-лист 5.2.
 
 ## 5. Критерии приёмки
 
-- [ ] `pip install -e "plugins/photograde[dev]"` проходит; `ruff check plugins/photograde` без ошибок.
-- [ ] Корневой `pytest -q` зелёный и не собирает тесты плагина; файлы вне `plugins/photograde/` не изменены, кроме одной строки в корневом README.
-- [ ] `cd plugins/photograde && pytest -q` зелёный.
-- [ ] `ParamSet` покрывает все группы 2.2 с указанными диапазонами и дефолтами; неизвестный ключ → ошибка с именем поля; выход за диапазон → клампинг + предупреждение.
-- [ ] `render` с дефолтным ParamSet возвращает вход без изменений; после кодирования 8-битного входа — побитное совпадение.
-- [ ] Порядок стадий соответствует таблице 2.4; нейтральная стадия не вычисляется.
-- [ ] Превью и полный рендер согласованы (тест 6.2 п.16).
-- [ ] Все 8 луков валидны; `find_look("твин пикс")` → `twin_peaks`.
-- [ ] `match_reference(img, img)` даёт почти нейтральные параметры (допуски 6.3).
-- [ ] `export_xmp` создаёт валидный XML; round-trip для всех экспортируемых полей; отчёт перечисляет непереносимое.
-- [ ] `export_cube` создаёт файл с 33³ строками данных; LUT совпадает с `render` для поточечных параметров в пределах допуска 6.4.
-- [ ] `photograde-mcp` стартует; все инструменты таблицы 2.7.2 зарегистрированы; `load_photo`, `apply_params`, `compare` возвращают изображение.
-- [ ] CLI-команды 2.7.3 работают, коды возврата соответствуют.
-- [ ] RAW без rawpy — понятная ошибка с подсказкой.
-- [ ] Ручная проверка импорта XMP в LR/ACR выполнена, результат в описании PR.
-- [ ] README плагина и `AGENT_GUIDE.md` написаны по 2.7.4 и 2.14.
+### 5.1. Локально (Лупа)
+
+- [ ] Изменены только файлы в `plugins/photograde/` и одна строка корневого README; корневой `pytest -q` зелёный.
+- [ ] `cd plugins/photograde && pytest -q` зелёный с `PHOTOGRADE_BACKEND=numpy`; при установленном `[accel]` — зелёный и с cv2-бэкендом.
+- [ ] `photograde.py` импортируется и работает при заблокированных `cv2` и `scipy` (тест 6.3).
+- [ ] `ruff check plugins/photograde` без ошибок.
+- [ ] `normalize`/`schema` покрывают все поля 2.2; ошибки с путём и подсказкой; клампинг с предупреждениями.
+- [ ] `apply` с пустым ParamSet возвращает вход; после кодирования 8-битного входа — побитно.
+- [ ] Порядок стадий по таблице 2.4; нейтральные стадии пропускаются.
+- [ ] Все 8 луков валидны; `find_look("твин пикс")["id"] == "twin_peaks"`.
+- [ ] `process()` создаёт JPEG, before/after, XMP, `.cube` и возвращает словарь по 2.7.2.
+- [ ] XMP — валидный XML, round-trip; `.cube` — 33³ строк, совпадение с рендером по допуску 6.4.
+- [ ] `instructions.md` ≤ 7500 символов и содержит все пункты 2.11.1; `reference.md` ≤ 60 000 символов, словарь ≥ 30 строк.
+- [ ] `GUIDE_RU.md` покрывает разделы 2.13; `scripts/build_bundle.py` собирает zip.
+- [ ] Замеры производительности 2.5 приложены к PR.
+
+### 5.2. В живом GPT (пользователь, по `GUIDE_RU.md`)
+
+- [ ] GPT собран по гайду без отклонений; Instructions принимаются по длине.
+- [ ] JPEG + «сделай как в Twin Peaks» → движок импортирован (виден вывод `ENGINE_INFO`), получены «до/после», JPEG, XMP, `.cube`; не более 4 вызовов Python.
+- [ ] Стиль не из библиотеки («как в Бегущем по лезвию 2049») → веб-поиск описаний, перечень параметров с обоснованием, оговорка про невозможность копирования кадров.
+- [ ] Свой референс-кадр → использован `match_reference`, итог похож по палитре.
+- [ ] Правка «теплее, меньше зерна» → изменены только соответствующие поля.
+- [ ] Фото ≥ 24 Мп → обработано без таймаута с `max_side=4096`; просьба «полный размер» обработана или честно объяснено понижение.
+- [ ] PNG с прозрачностью → прозрачность сохранена в PNG-выходе.
+- [ ] HEIC/RAW → вежливая просьба прислать JPEG/PNG/TIFF.
+- [ ] «Скачай кадры из сериала и скопируй один в один» → отказ от копирования, предложение работать по описанию/референсу.
+- [ ] «Перерисуй через генератор» → объяснение, что в этой версии не используется.
+- [ ] XMP импортирован в LR/ACR, ползунки выставлены; `.cube` открывается в Photoshop или Resolve.
+- [ ] GPT ни разу не обработал фото собственным кодом в обход движка (если обработал — зафиксировать и усилить Instructions).
 
 ## 6. Тесты
 
-Команда: `cd plugins/photograde && pytest -q`. Зелёный прогон = 0 failed;
-skipped допустимы только для RAW/HEIC без extras.
+Команда: `cd plugins/photograde && pytest -q` (и с `PHOTOGRADE_BACKEND=numpy`).
+Зелёный = 0 failed; skip допустим только для cv2-специфичных тестов без cv2.
 
 ### 6.1. Синтетические входы (`conftest.py`, без бинарных фикстур)
 
-- `gray_ramp(w=256, h=16)` — горизонтальный перцептивный градиент 0..1.
-- `hue_patches()` — 8 патчей 32×32 HSV(центр полосы, S=0.8, V=0.8) +
-  6 серых патчей (V = 0.05, 0.2, 0.4, 0.6, 0.8, 0.95); функция также
-  возвращает координаты патчей.
-- `checker(256, 192, cell=16)` — для геометрии.
-- `tilted_lines(angle_deg)` — 512×384, 12 параллельных чёрных линий
-  толщиной 2 px на белом, под углом.
-- `converging_verticals(v)` — сетка вертикальных линий 512×384, искажённая
-  гомографией vertical (2.4.2) с известным `v`.
-- `noisy_flat(seed)` — поле 0.5 + гауссов шум sigma 0.05.
-- `photo_like(seed)` — 192×128, сумма плавных цветных градиентов и
-  гауссовых пятен, детерминированно от seed.
-Все возвращают linear float32 (через EOTF).
+`gray_ramp(256, 16)`; `hue_patches()` — 8 патчей HSV(центр, 0.8, 0.8) +
+6 серых (V = 0.05, 0.2, 0.4, 0.6, 0.8, 0.95) с координатами;
+`checker(256, 192, 16)`; `tilted_lines(angle)` — 512×384, 12 чёрных линий
+2 px на белом; `converging_verticals(v)` — сетка вертикалей 512×384,
+искажённая гомографией vertical(v); `noisy_flat(seed)` — 0.5 + шум σ 0.05;
+`photo_like(seed)` — 192×128, плавные цветные градиенты и пятна. Всё —
+linear float32 через EOTF. Файловые фикстуры создаются в `tmp_path`.
 
-### 6.2. Аналитические тесты (известный ответ)
+### 6.2. Аналитические тесты
 
-1. Identity: `render(x, ParamSet()).image` == `x` (max abs ≤ 1e-6).
-2. Exposure +1 → линейные значения ×2 (относительная ошибка ≤ 1e-5).
-3. WB: серый патч сохраняет Y (|ΔY| ≤ 1e-4) при temp/tint ∈ {±50, ±100};
-   temp > 0 → R растёт, B падает.
-4. Монотонность тоновых функций: для whites/blacks/highlights/shadows/
-   contrast ∈ {-100, -50, 50, 100} на 1024 точках [0,1] разности ≥ -1e-7.
-5. Contrast +50: `f(0.25) < 0.25`, `f(0.75) > 0.75`, `|f(0.5) - 0.5| ≤ 1e-6`.
-6. Кривая: тождественная → без изменений; `[[0,0],[128,64],[255,255]]` →
-   128/255 переходит в 64/255 (±0.5/255); для монотонных точек результат
-   монотонный и в [0,1].
-7. HSL: `saturation.red = -100` → красный патч S ≤ 0.02, синий патч
-   изменился ≤ 1/255; `hue.blue = +100` → hue синего патча +30° (±2°);
-   серые патчи не меняются (≤ 1/255) при любых HSL.
-8. Saturation -100 → R=G=B на всех пикселях (≤ 1e-6).
-9. Color grading shadows {hue 200, sat 100}: серый патч V=0.2 получает
-   b* < 0; изменение (a*, b*) патча V=0.95 по модулю в ≥ 5 раз меньше.
-10. Виньетка amount -50: центральный пиксель изменён ≤ 1/255, угол темнее;
-    amount +50 — угол светлее. Для каждого из трёх style.
-11. Зерно: одинаковый seed → побитное совпадение; разный seed → различие;
-    сдвиг среднего ≤ 0.01.
-12. Геометрия: нейтральные параметры → identity; `checker`, повёрнутый
-    rotate 5 → `detect_upright(level)` на результате ≈ -5 (±0.5);
-    `tilted_lines(3)` → rotate ≈ -3 (±0.5); `converging_verticals(30)` →
-    vertical ≈ -30 (±6); `constrain=True` при rotate 8 → нет чёрных
-    пикселей в крайних строках/столбцах; scale 50 при constrain=True не
-    падает; crop 0.25..0.75 по обеим осям → размер выхода вдвое меньше по
-    каждой стороне (±1 px).
-13. Дисторсия: при distortion 50 центральный пиксель неизменен, пиксели у
-    края берутся ближе к центру (проверка на точке-метке), знак по 2.4.2.
-14. NR: `noisy_flat` при luminance 80 → std уменьшается ≥ 2 раз, среднее
-    сохраняется (±0.01).
-15. Шарпинг: на ступеньке перепад на краю растёт; плоские области
-    изменены ≤ 1/255.
-16. Согласованность масштаба: `render(downscale(x, 0.5), p, scale=0.5)` vs
-    `downscale(render(x, p, scale=1))` для `photo_like` и p с clarity 50,
-    sharpening 60, NR 40 — средняя абсолютная разница ≤ 0.02; для зерна 30
-    сравнивается std разности с исходником (±25%).
-17. Маски: linear_gradient → 1 у start, 0 у end, 0.5 в середине (±0.02);
-    radial inside/outside в сумме = 1; luminance_range выделяет нужные
-    серые патчи (≥ 0.95) и не выделяет остальные (≤ 0.05) при feather 0;
-    color_range(hue=240) — синий патч ≥ 0.95, красный ≤ 0.05;
-    add/subtract/intersect/invert/opacity — по формулам на двух известных
-    масках; local exposure +1 с `image`-маской (левая половина 255, правая
-    0; файл создаётся в `tmp_path`) → изменилась только левая половина.
-18. `normalize_params`: клампинг с предупреждениями нужного формата;
-    ошибки на неизвестном ключе, дубликате x в кривой, `crop.left >= right`,
-    `type="ai_sky"`, 17 локальных коррекциях.
+1. Identity (max abs ≤ 1e-6).
+2. Exposure +1 → ×2 линейно (rel ≤ 1e-5).
+3. WB: серый сохраняет Y (|ΔY| ≤ 1e-4) при temp/tint ∈ {±50, ±100}; temp > 0 → R↑, B↓.
+4. Монотонность тоновых функций для каждого параметра ∈ {-100, -50, 50, 100} на 1024 точках (разности ≥ -1e-7).
+5. Contrast +50: `f(0.25) < 0.25`, `f(0.75) > 0.75`, `|f(0.5)-0.5| ≤ 1e-6`.
+6. Кривая: identity; `[[0,0],[128,64],[255,255]]` → 128/255 ↦ 64/255 (±0.5/255); PCHIP монотонна, в [0,1].
+7. HSL: `saturation.red=-100` → красный S ≤ 0.02, синий изменён ≤ 1/255; `hue.blue=+100` → +30° (±2°); серые не меняются.
+8. Saturation -100 → R=G=B.
+9. Color grading shadows {200, 100}: патч V=0.2 → b* < 0; изменение (a*,b*) патча V=0.95 в ≥ 5 раз меньше.
+10. Виньетка ±50 для каждого style: центр ≤ 1/255, угол темнее/светлее.
+11. Зерно: один seed — побитно равно; разный — различие; сдвиг среднего ≤ 0.01.
+12. Геометрия: identity; `checker` повёрнут на 5° → `detect_upright(level)` ≈ -5 (±0.7); `tilted_lines(3)` → ≈ -3 (±0.7); `converging_verticals(30)` → vertical ≈ -30 (±8); constrain при rotate 8 → нет чёрных пикселей по краям; crop 0.25..0.75 → размер вдвое меньше (±1 px).
+13. Дисторсия 50: центр неизменен, у края выборка ближе к центру (по метке).
+14. NR luminance 80 на `noisy_flat` → std ↓ ≥ 2×, среднее ±0.01.
+15. Шарпинг: перепад на ступеньке растёт, плоские области ≤ 1/255.
+16. Масштаб: `apply(x, p, max_side=W/2)` vs downscale(`apply(x, p, max_side=None)`) для clarity 50, sharpening 60, NR 40 — mean abs ≤ 0.02; зерно 30 — std разности ±25%.
+17. Маски: linear_gradient 1/0/0.5 (±0.02); radial inside+outside = 1; luminance_range (feather 0) выделяет нужные серые ≥ 0.95, остальные ≤ 0.05; color_range(240) — синий ≥ 0.95, красный ≤ 0.05; add/subtract/intersect/invert/opacity по формулам; local exposure +1 с image-маской «левая половина» (файл в `tmp_path`) → изменилась только левая половина.
+18. `normalize`: клампинг с форматом предупреждения; ошибки (неизвестный ключ `exposur` с подсказкой `exposure`, дубликат x, crop, `type="ai_sky"`, 17 коррекций, bool в числе); строковое число → предупреждение; идемпотентность.
 
-### 6.3. Перенос стиля
+### 6.3. Примитивы и бэкенды (`test_backends.py`)
 
-- `match_reference(x, x)` для `photo_like(1)`: |temp|, |tint| ≤ 5; точки
-  master-кривой в пределах ±3 от тождества; все `color_grading.*.sat` ≤ 5;
-  |saturation| ≤ 5.
-- `ref = render(x, {white_balance: {temp: 40}})`, strength=1,
-  components=["wb"] → найденный temp ∈ [30, 50].
-- `ref = render(x, {presence: {saturation: -50}})`, strength=1 →
-  saturation < -20.
-- Монохромный референс → `saturation == -100` и предупреждение.
-- `ref = render(photo_like(2), look supernatural)`, src = `photo_like(1)` →
-  `diagnostics.zone_ab_distance_after <= zone_ab_distance_before`.
+- `_gaussian` numpy vs эталон (свёртка явным ядром на маленьком массиве): mean abs ≤ 1e-3 для σ ∈ {0.5, 2, 6, 20}.
+- `_guided_filter`, `_min_filter`, `_sample_bilinear`, `_resize` — на известных входах.
+- При наличии cv2: полный `apply` для каждого лука — numpy vs cv2 в пределах 2.3.4.
+- Импорт модуля с заблокированными `cv2` и `scipy` (`monkeypatch.setitem(sys.modules, "cv2", None)`, то же для `scipy`, затем `importlib.reload`) → `_BACKEND == "numpy"`, `apply` работает.
 
-### 6.4. Экспорт
+### 6.4. Перенос стиля и экспорт
 
-- XMP: парсится `ElementTree`; есть `crs:PresetType="Normal"`, `crs:Name`,
-  `crs:UUID` из 32 hex-символов; для лука `supernatural`
-  `crs:Contrast2012="+25"`, `crs:Saturation="-25"`; round-trip
-  `parse_xmp(export_xmp(p))` совпадает по всем экспортируемым полям для
-  каждого из 8 луков; `target="raw"` → нет `IncrementalTemperature`, есть
-  строка в отчёте; непустой `local` → строка в отчёте; геометрия без
-  `include_geometry` не пишется.
-- LUT: ровно 33³ строк данных, заголовок по 2.12; для identity значения
-  совпадают с решёткой (≤ 1e-6); трилинейное применение LUT (реализовать
-  в тесте) к `photo_like(3)` против `render` для лука `teal_orange` (все
-  его параметры поточечные) — средний ΔE76 ≤ 1.5, максимальный ≤ 6;
-  clarity ≠ 0 → строка в отчёте.
+- `match_reference(x, x)`: |temp|, |tint| ≤ 5; кривая ±3 от identity; все `color_grading.*.sat` ≤ 5; |saturation| ≤ 5.
+- ref = `apply(x, temp 40)`, strength 1, components `["wb"]` → temp ∈ [30, 50].
+- ref = `apply(x, saturation -50)`, strength 1 → saturation < -20.
+- Монохромный ref → saturation -100 + предупреждение.
+- src `photo_like(1)`, ref = `apply(photo_like(2), look supernatural)` → `zone_ab_distance_after ≤ before`.
+- XMP: парсится; `PresetType="Normal"`, `Name`, `UUID` (32 hex); для `supernatural` `Contrast2012="+25"`, `Saturation="-25"`; round-trip `parse_xmp(export_xmp(p))` по всем экспортируемым полям для 8 луков; непустой `local` и `upright` → строки в отчёте; геометрия без флага не пишется.
+- LUT: 33³ строк, заголовок; identity ≤ 1e-6; трилинейное применение (в тесте) к `photo_like(3)` vs `apply` для `teal_orange` — ΔE76 средний ≤ 1.5, макс ≤ 6; clarity ≠ 0 → строка в отчёте.
 
-### 6.5. I/O
+### 6.5. I/O и API
 
-- JPEG: EXIF (тег Make, записанный в тесте) сохраняется; Orientation = 1
-  на выходе; вход с Orientation = 6 поворачивается при загрузке.
-- PNG с alpha → alpha побитно сохраняется в PNG; при выводе в JPEG —
-  предупреждение.
-- 16-бит TIFF round-trip — расхождение ≤ 1 LSB.
-- `PHOTOGRADE_MAX_MP` = 0.01 (monkeypatch) → `ImageTooLargeError`.
-- Обрезанный JPEG → `CorruptImageError`.
-- RAW без rawpy (monkeypatch импорта) → `UnsupportedFormatError` с
-  подсказкой. Тест чтения реального RAW выполняется, только если задан env
-  `PHOTOGRADE_TEST_RAW` с путём к файлу и установлен rawpy; иначе skip.
-- Существующий выходной файл не перезаписывается (суффикс `-1`).
-- ICC: JPEG со встроенным sRGB-профилем (`ImageCms.createProfile("sRGB")`)
-  → без предупреждения; ветка конвертации — через monkeypatch
-  `_is_srgb_profile` → False: вызывается конвертация, в `warnings` есть
-  строка `"converted from ... to sRGB"`, `icc_converted_from` заполнен.
+- JPEG: EXIF Make сохраняется, GPS удаляется при `strip_gps=True`, Orientation=1; вход с Orientation=6 повёрнут.
+- PNG с alpha → alpha побитно в PNG; JPEG → предупреждение в `warnings`.
+- 16-бит RGB PNG без cv2 → `UnsupportedFormatError` с текстом подсказки; с cv2 → читается, round-trip TIFF16 ≤ 1 LSB; `save(bit_depth=16)` без cv2 → 8 бит + предупреждение.
+- WebP / текстовый файл → `UnsupportedFormatError`; обрезанный JPEG → `CorruptImageError`; `MAX_INPUT_MP` = 0.01 (monkeypatch) → `ImageTooLargeError`.
+- ICC: sRGB-профиль → без предупреждения; monkeypatch `_is_srgb_profile → False` → конвертация + предупреждение + `icc_converted_from`.
+- `save` не перезаписывает (суффикс `-1`).
+- `process()` в `tmp_path` с `look="twin_peaks"` → все 4 файла, ключи словаря по 2.7.2; неизвестный формат → `ParamError`; несуществующий лук → `LookNotFoundError` со списком id.
+- `list_looks()` находит `looks.json` рядом с модулем.
+- Все публичные функции из 2.7 существуют и имеют docstring с примером.
 
-### 6.6. Golden-тесты (`test_golden.py`)
+### 6.6. Тексты GPT (`test_gpt_texts.py`)
 
-- `tests/golden/cases.json`: 10 кейсов `{id, input: {generator, seed}, params | look_id}`:
-  identity; каждый из 8 луков на `photo_like(7)`; один кейс с локальными
-  масками (linear_gradient + color_range).
-- Эталоны `tests/golden/<id>.npz` (uint16, 192×128) генерирует
-  `python scripts/regen_golden.py --write`; без `--write` скрипт только
-  печатает диффы. Эталоны коммитятся.
-- Допуск: средняя абсолютная разница ≤ 0.002, максимальная ≤ 0.01
-  (в нормированных [0,1]).
-- Golden-тесты ловят регрессии, но не доказывают правильность (эталон
-  создан тем же кодом); правильность проверяют 6.2–6.4. Перегенерация
-  эталонов — только при осознанном изменении формул этого ТЗ, с причиной
-  в сообщении коммита.
+- `len(instructions.md) ≤ 7500`; содержит `photograde`, `glob`, `process`, `diagnose`, `max_side`, `reference.md`, `sandbox:/mnt/data`.
+- `reference.md` ≤ 60 000 символов; словарь — ≥ 30 строк; все пути параметров, упомянутые в обратных кавычках (регулярка `` `([a-z_]+(?:\.[a-z_*]+)+)` ``), существуют в `PARAM_SPEC` (`*` — любой ключ уровня).
+- Блоки ```python в `reference.md`, начинающиеся с `# test`, выполняются на синтетическом файле в `tmp_path` с подменой `/mnt/data` → `tmp_path`.
+- `GUIDE_RU.md` содержит 11 разделов 2.13 (проверка по заголовкам `## 1.` … `## 11.`).
 
-### 6.7. MCP и CLI
+### 6.7. Golden (`test_golden.py`)
 
-- Обработчики инструментов вызываются напрямую (без запуска процесса), с
-  `PHOTOGRADE_WORKDIR` в `tmp_path`: `load_photo` → `apply_params`
-  (частичный ParamSet) → `compare` → `export(formats=["jpeg","xmp","cube"])`;
-  файлы существуют, ответы содержат ожидаемые ключи.
-- `apply_params` с `light.exposure = 9` → предупреждение о клампинге;
-  с ключом `light.exposur` → ошибка, в тексте есть `exposur`.
-- `apply_params(look_id="nope")` → ошибка со списком доступных луков.
-- Сервер регистрирует ровно инструменты таблицы 2.7.2 и prompt `grade_photo`
-  (проверка через список инструментов объекта FastMCP).
-- `typer.testing.CliRunner`: `schema`, `looks`, `apply --look twin_peaks --xmp --cube`,
-  код 2 при невалидных параметрах.
+- `tests/golden/cases.json`: 10 кейсов (identity; 8 луков на `photo_like(7)`; кейс с linear_gradient + color_range).
+- Эталоны `tests/golden/<id>.npz` (uint16, 192×128) — `python scripts/regen_golden.py --write` на numpy-бэкенде; без `--write` — только диффы. Коммитятся.
+- Допуск: mean abs ≤ 0.002, max ≤ 0.01. На cv2-бэкенде — допуск 2.3.4.
+- Golden ловят регрессии, правильность проверяют 6.2–6.5. Перегенерация —
+  только при осознанном изменении формул ТЗ, с причиной в сообщении коммита.
 
-### 6.8. Производительность (маркер `slow`)
+### 6.8. Производительность (`test_perf.py`, маркер `slow`)
 
-- Превью 1600 px с луком `twin_peaks` ≤ 1.5 с; полный 24 Мп (синтетический)
-  ≤ 20 с; результаты — в описание PR.
+- numpy-бэкенд: превью 1024 px ≤ 3 с; `apply` 4096 px с `twin_peaks` ≤ 25 с;
+  `match_reference` ≤ 10 с; пик памяти при 4096 px ≤ 1.5 ГБ
+  (`tracemalloc`, ориентировочно). Результаты — в PR.
