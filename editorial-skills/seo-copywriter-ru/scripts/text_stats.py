@@ -77,9 +77,10 @@ def split_sentences(text: str) -> list[str]:
     start = 0
     for match in SENTENCE_END_RE.finditer(text):
         before = text[start:match.start()].split()
-        last = before[-1].lower().lstrip("(«\"") if before else ""
+        last = before[-1].lstrip("(«\"").rstrip(".") if before else ""
         # Initials ("А. С.") and abbreviations ("т. е.", "стр. 8") do not end a sentence.
-        if len(last.rstrip(".")) == 1 or last in ABBREVIATIONS:
+        initial = len(last) == 1 and last.isalpha() and last.isupper()
+        if initial or last.lower() in ABBREVIATIONS:
             continue
         parts.append(text[start:match.end()])
         start = match.end()
