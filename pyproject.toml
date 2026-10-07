@@ -53,3 +53,5 @@ exclude = ["src/reviewer/web/**"]
 "tests/*" = ["E501"]
 # Holds a long Russian sample text and UI strings; keep them on one line.
 "app.py" = ["E501"]
+# Russian hints and stop-list patterns read better on one line.
+"editorial-skills/seo-copywriter-ru/scripts/lint_text.py" = ["E501"]
