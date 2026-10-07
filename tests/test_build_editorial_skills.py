@@ -52,6 +52,7 @@ def test_build_real_skills(tmp_path):
     assert "seo-editor-ru/references/stop-list.md" in names["seo-editor-ru"]
     assert not any(n.endswith("stop-list.md") for n in names["seo-fresh-reader-ru"])
     assert "seo-editor-ru/scripts/text_stats.py" in names["seo-editor-ru"]
+    assert "seo-editor-ru/scripts/lint_text.py" in names["seo-editor-ru"]
 
 
 def test_build_is_deterministic(tmp_path):

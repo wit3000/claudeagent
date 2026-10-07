@@ -25,6 +25,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SHARED_FILES = [
     ("_shared/stop-list.md", "references/stop-list.md", ("seo-copywriter-ru", "seo-editor-ru")),
     ("seo-copywriter-ru/scripts/text_stats.py", "scripts/text_stats.py", ("seo-editor-ru",)),
+    ("seo-copywriter-ru/scripts/lint_text.py", "scripts/lint_text.py", ("seo-editor-ru",)),
+    ("seo-copywriter-ru/references/craft.md", "references/craft.md", ("seo-editor-ru",)),
+    ("seo-copywriter-ru/references/case-balms.md", "references/case-balms.md", ("seo-editor-ru",)),
 ]
 
 ALLOWED_FIELDS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
