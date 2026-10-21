@@ -34,7 +34,8 @@ def test_stop_list_phrase_is_error():
 
 
 def test_register_word_is_warning():
-    assert quotes("## Как подобрать бальзам под свою задачу\n", "слово не из темы") == ["задачу"]
+    assert quotes("## Как подобрать бальзам под свою задачу\n", "стоп-лист") == ["под свою задачу"]
+    assert quotes("## Бальзам решит эту задачу\n", "слово не из темы") == ["задачу"]
 
 
 def test_markers_and_links_are_ignored():
@@ -119,3 +120,41 @@ def test_rewritten_article_is_clean():
     assert not any(f.level == "error" for f in good)
     assert not {f.category for f in good} & {"шаблон", "нет связок", "рубленый ритм", "оговорки"}
     assert len(good) * 2 < len(bad)
+
+
+def test_impersonal_verb_without_actor():
+    found = quotes("Такие модели берут для дачи.\n", "кто действует?")
+    assert len(found) == 1
+    assert quotes("Дачники берут такие модели, потому что им не страшны перепады напряжения.\n",
+                  "кто действует?") == []
+
+
+def test_named_actor_without_reason_and_vague_actor():
+    assert quotes("Хургаду выбирают семьи.\n", "кто действует?")
+    assert quotes("Многие предпочитают газ.\n", "кто действует?") == ["Многие"]
+
+
+def test_short_and_modal_words_repeat():
+    text = "Можно съездить в старый город. Можно поплавать с маской.\n"
+    assert any("можн" in f.hint for f in lint_text.lint(text) if f.category == "повтор слова")
+
+
+def test_same_root_in_one_sentence():
+    text = "Кирпичную кладку делают из кирпича, который выдерживает мороз.\n"
+    assert quotes(text, "повтор слова")
+
+
+def test_heading_echo_on_h3():
+    text = "### Кирпичные печи\n\nКирпичная кладка долго набирает температуру, зато держит тепло до утра.\n"
+    assert quotes(text, "эхо заголовка")
+    text = "### Кирпичные печи\n\nТакая печь долго набирает температуру, зато держит тепло до утра.\n"
+    assert all("кирпич" not in f.hint for f in lint_text.lint(text) if f.category == "эхо заголовка")
+
+
+def test_editor_markers_and_slang():
+    found = lint_text.lint("Модель закрывает задачи склада. Фишка в том, что это реально крутая вещь.\n")
+    errors = [f.quote.lower() for f in found if f.level == "error"]
+    assert "закрывает задачи" in errors and "фишка" in errors
+    assert errors.count("закрывает задачи") == 1
+    assert ("warn", "просторечие") in {(f.level, f.category) for f in found}
+    assert ("warn", "слово не из темы") in categories("Аэропорт удобно расположен.\n")

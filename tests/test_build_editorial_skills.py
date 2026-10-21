@@ -51,6 +51,9 @@ def test_build_real_skills(tmp_path):
     assert "seo-copywriter-ru/references/stop-list.md" in names["seo-copywriter-ru"]
     assert "seo-editor-ru/references/stop-list.md" in names["seo-editor-ru"]
     assert not any(n.endswith("stop-list.md") for n in names["seo-fresh-reader-ru"])
+    for shared in ("phrase.md", "self-check.md", "norms-2026.md"):
+        assert f"seo-copywriter-ru/references/{shared}" in names["seo-copywriter-ru"]
+        assert f"seo-editor-ru/references/{shared}" in names["seo-editor-ru"]
     assert "seo-editor-ru/scripts/text_stats.py" in names["seo-editor-ru"]
     assert "seo-editor-ru/scripts/lint_text.py" in names["seo-editor-ru"]
 
