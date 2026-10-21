@@ -10,3 +10,7 @@ out/
 logs/
 data/
 .pytest_cache/
+
+# Article drafts; client cards in articles/_clients/ are kept in git
+articles/*
+!articles/_clients/
