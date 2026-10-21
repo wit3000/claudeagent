@@ -7,9 +7,10 @@ Usage:
     cat article.md | python3 scripts/lint_text.py -
 
 Finds what can be found without understanding the text: stop-list phrases,
-words from the wrong register, choppy runs of short sentences, paragraphs
-without links between sentences, repeated wording, template cards, too many
-"the manufacturer claims" disclaimers and typography errors. Cohesion and word
+words from the wrong register, slang, actions without a named actor ("берут",
+"выбирают"), choppy runs of short sentences, paragraphs without links between
+sentences, repeated words and roots, template cards, too many "the manufacturer
+claims" disclaimers and typography errors. Cohesion and word
 choice still need a slow human-style reading; this script only makes sure the
 obvious things are not missed.
 
@@ -115,6 +116,34 @@ STOP_PATTERNS: list[tuple[str, str]] = [
     (r"\bкак видите\b", "удали"),
     (r"формул\w* безопасн\w*", "калька с этикетки: «подходит для…»"),
     (r"вед[её]т себя на", "калька: «подходит ли»"),
+    (r"закрыва\w* (задач|потребност|вопрос|запрос|бол[ьи])\w*", "машинный жаргон — «подходит для», «справляется с», «хватает для»"),
+    (r"закры(ть|л|ла|ли) (задач|потребност|вопрос|запрос|бол[ьи])\w*", "машинный жаргон — «подходит для», «справляется с»"),
+    (r"под (вашу|свою|любую|любые|ваши|свои|конкретную|конкретные) задач\w*", "абстракция — слова из мира темы: «под свой дом и бюджет»"),
+    (r"(полн|широк)\w* спектр\w*", "перечисли, что именно"),
+    (r"оптимальн\w* (решени|выбор|вариант)\w*", "оптимальный по какому параметру? назови его"),
+    (r"заслужива\w* (особого )?внимани\w*", "скажи, чем именно интересно"),
+    (r"отдельно стоит (рассмотреть|сказать|упомянуть)", "сразу содержание"),
+    (r"(звучит )?знакомо\?", "риторический крючок — опиши ситуацию"),
+    (r"\bпризнайтесь\b|\bсогласитесь\b", "фальшивая задушевность"),
+    (r"\bспойлер\b", "фальшивая задушевность"),
+    (r"(это )?не магия|никакой магии", "штамп «не X, а Y» — скажи, как это устроено"),
+    (r"главн\w* секрет|правило (одно|простое)|вот (что|в ч[её]м) (важно|фишка|секрет)", "псевдооткрытие — сразу конкретика"),
+    (r"\bфишк\w*", "жаргон — «особенность», «удачная деталь» или конкретика"),
+    (r"\bтопов\w*", "жаргон — «лучший в подборке» с основанием"),
+    (r"\bбомбическ\w*|\bкайф\w*", "жаргон"),
+    (r"\bзамороч\w*|не парьтесь", "просторечие — «не придётся…»"),
+    (r"\bлайфхак\w*", "жаргон — «совет», «приём»"),
+    (r"\bюза(ть|ют|ет|ем)\b", "жаргон"),
+]
+
+# Colloquialisms that are sometimes fine ("путь короче", "реально ли"): look, don't auto-fix.
+SLANG_PATTERNS: list[tuple[str, str]] = [
+    (r"(^|[.!?…]\s+)короче,", "просторечие в начале фразы"),
+    (r"\bреально (крут|классн|удобн|помога|работа|хорош)\w*", "«реально» как усилитель — убери или дай факт"),
+    (r"\bзаш(ло|ла|ли|[её]л)\b", "просторечие — «понравился» с основанием"),
+    (r"\bогонь\b", "просторечие, если не о пламени"),
+    (r"\bсупер\b|\bвау\b", "просторечие"),
+    (r"\bдержите\b|\bловите\b", "фамильярное обращение"),
 ]
 
 # Words that usually come from the wrong register in consumer topics
@@ -133,7 +162,24 @@ REGISTER_PATTERNS: list[tuple[str, str]] = [
     (r"\bпроизвод(ит|ят)ся\b", "пассив-канцелярит"),
     (r"\bэффект(ом|а|у)?\b", "размытое слово — скажи, что происходит"),
     (r"\bработа(ет|ют)\b", "о веществах и средствах так не говорят — скажи, что именно делает"),
+    (r"\bудобн\w*", "«удобно» — только о физическом комфорте; иначе «проще», «быстрее», «ближе» или причина"),
+    (r"\bзакрыва\w*", "«закрывать» — только в прямом смысле: дверь, заслонка, контур"),
 ]
+
+# 3rd person plural verbs that hide who acts: "такие модели берут для дачи".
+IMPERSONAL_RE = re.compile(
+    r"\b(берут|покупают|приобретают|заказывают|используют|применяют|выбирают|предпочитают|ценят"
+    r"|любят|ставят|устанавливают|советуют|рекомендуют|хвалят|отмечают|держат|ищут)\b",
+    re.IGNORECASE,
+)
+# Who may act: pronouns and animate nouns (agent suffixes or a short list of people).
+ACTOR_RE = re.compile(
+    r"\b(они|мы|кто|те|оба|обе|семьи|дети|люди|мамы|родители|мастера|врачи|хозяйки|новички|профессионалы"
+    r"|[а-яё]+(?:тели|ники|щики|чики|исты|еры|ёры|анты|енты|цы|ане|яне|логи|ологи))\b",
+    re.IGNORECASE,
+)
+VAGUE_ACTOR_RE = re.compile(r"\b(многие|большинство|люди|вс[её] чаще|вс[её] больше людей)\b", re.IGNORECASE)
+REASON_RE = re.compile(r"потому что|так как|из-за|благодаря|чтобы|\bза\b|\bесли\b|\bкогда\b|[:—]", re.IGNORECASE)
 
 ATTRIBUTION_RE = re.compile(
     r"производител\w* (заявля|обеща|утвержда|указыва|рекоменду|сообща|пиш)\w*"
@@ -245,13 +291,21 @@ def short_quote(text: str, limit: int = 120) -> str:
 def check_patterns(blocks, findings):
     compiled_stop = [(re.compile(p, re.IGNORECASE), h) for p, h in STOP_PATTERNS]
     compiled_reg = [(re.compile(p, re.IGNORECASE), h) for p, h in REGISTER_PATTERNS]
+    compiled_slang = [(re.compile(p, re.IGNORECASE), h) for p, h in SLANG_PATTERNS]
     for block in blocks:
         text = plain(block.text)
+        for regex, hint in compiled_slang:
+            for match in regex.finditer(text):
+                findings.append(Finding("warn", "просторечие", block.line, match.group(0).strip(" .!?…"), hint))
+        spans = []
         for regex, hint in compiled_stop:
             for match in regex.finditer(text):
+                spans.append(match.span())
                 findings.append(Finding("error", "стоп-лист", block.line, match.group(0), hint))
         for regex, hint in compiled_reg:
             for match in regex.finditer(text):
+                if any(a <= match.start() < b for a, b in spans):
+                    continue  # already an error
                 findings.append(Finding("warn", "слово не из темы", block.line, match.group(0), hint))
 
 
@@ -362,25 +416,109 @@ def check_templates(blocks, findings):
                                     "абзацы начинаются одинаково — начни по-разному"))
 
 
+# Inflectional endings, longest first. A light stemmer is enough to see that
+# «кирпичная» and «кирпич» or «можно» and «можно» are the same word.
+ENDINGS = sorted(
+    """
+    иями ями ами ием иях ях ах ов ев ей ой ий ый ая яя ое ее ые ие ую юю ым им ом ем ых их
+    ого его ому ему ыми ими ешь ишь ете ите ет ит ут ют ат ят ем им ла ло ли ть ти чь ся сь
+    ия ья ие ье ию ью а я о е у ю ы и й ь
+    """.split(),
+    key=len,
+    reverse=True,
+)
+# Words that repeat by nature. Modal and filler words («можно», «нужно», «очень»,
+# «также») are deliberately not here: their repeats are the most visible ones.
+FUNCTION_WORDS = set(
+    """
+    этот эта это эти этого этой этому этим этих этом тот та то те того той тому тем тех том
+    такой такая такое такие таким таких такую так как если когда чтобы или либо чем что кто
+    который которая которое которые которого которой которым которых котором которую
+    свой своя своё свои своего своей своим своих свою его её их они она оно него нему ним ней
+    нее неё нем нём вас вам ваш ваша ваше ваши вашего вашей вашим ваших нас нам наш наша наше
+    наши нашего нашей нашим наших для при без через после перед между около над под про
+    уже ещё тоже даже только лишь ли же бы есть быть был была было были будет будут может
+    могут нет все всё весь вся всех всем всеми всего всей себя себе собой тоже там тут здесь
+    где куда друг друга один одна одно одни одного одной раз два три года году лет более менее
+    """.split()
+)
+# Modal and filler words stay countable even when they are frequent in the text.
+ALWAYS_COUNT = {"можн", "нужн", "очен", "такж", "стоит", "сраз", "важн", "удобн", "прост"}
+
+
 def stem(word: str) -> str:
-    return word[:6]
+    word = word.lower().replace("ё", "е")
+    for ending in ENDINGS:
+        if word.endswith(ending) and len(word) - len(ending) >= 3:
+            return word[: -len(ending)]
+    return word
+
+
+def same_root(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    short, long_ = sorted((a, b), key=len)
+    if len(short) >= 4 and long_.startswith(short):
+        return True
+    common = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        common += 1
+    return common >= 5
+
+
+def content_stems(text: str) -> list[str]:
+    return [stem(w) for w in words(text)
+            if len(w) >= 4 and CYRILLIC_RE.match(w) and w.replace("ё", "е") not in FUNCTION_WORDS]
+
+
+def shared_roots(first: list[str], second: list[str]) -> list[str]:
+    found = []
+    for a in first:
+        if any(same_root(a, b) for b in second) and not any(same_root(a, f) for f in found):
+            found.append(a)
+    return found
+
+
+def topic_stems(blocks) -> set[str]:
+    """Topic words («бальзам» in an article about balms) repeat by design: they are
+    reported only in a chain of three sentences in a row."""
+    tokens = [s for b in blocks if b.kind not in ("table", "heading") for s in content_stems(plain(b.text))]
+    freq = Counter(tokens)
+    return {s for s, n in freq.items() if n >= max(5, len(tokens) // 150)} - ALWAYS_COUNT
+
+
+def is_topic(st: str, topic: set[str]) -> bool:
+    return any(same_root(st, t) for t in topic)
 
 
 def check_repeats(blocks, findings):
-    tokens = [w for b in blocks if b.kind != "table" for w in words(plain(b.text))]
-    freq = Counter(stem(w) for w in tokens if len(w) >= 7)
-    topic = {s for s, n in freq.items() if n >= max(4, len(tokens) // 200)} | FUNCTION_STEMS
+    topic = topic_stems(blocks)
+
     for block, sentences in sentences_of(blocks):
-        prev: set[str] = set()
+        history: list[list[str]] = []
         for sentence in sentences:
-            stems = [stem(w) for w in words(sentence)
-                     if len(w) >= 7 and CYRILLIC_RE.match(w) and not CONNECTOR_RE.fullmatch(w)
-                     and stem(w) not in topic]
-            doubled = {s for s, n in Counter(stems).items() if n > 1} | (set(stems) & prev)
-            for s in sorted(doubled):
+            stems = content_stems(sentence)
+            inside = []
+            for i, a in enumerate(stems):
+                if is_topic(a, topic):
+                    continue
+                if any(same_root(a, b) for b in stems[i + 1:]) and not any(same_root(a, f) for f in inside):
+                    inside.append(a)
+            reported = list(inside)
+            if history:
+                for root in shared_roots(stems, history[-1]):
+                    if any(same_root(root, r) for r in reported):
+                        continue
+                    chain = len(history) >= 2 and any(same_root(root, b) for b in history[-2])
+                    if not is_topic(root, topic) or chain:
+                        reported.append(root)
+            for root in reported:
                 findings.append(Finding("warn", "повтор слова", block.line, short_quote(sentence),
-                                        f"«{s}…» дважды рядом"))
-            prev = set(stems)
+                                        f"«{root}…» повторяется в этом или соседнем предложении — "
+                                        "местоимение, опущение, другая конструкция; термин синонимом не заменяй"))
+            history.append(stems)
     seen: dict[tuple, int] = {}
     reported_lines: set[tuple[int, int]] = set()
     for block in blocks:
@@ -398,19 +536,44 @@ def check_repeats(blocks, findings):
                                         f"та же формулировка уже была в строке {first}"))
 
 
+QUOTED_RE = re.compile(r"«[^»]*»|\"[^\"]*\"")
+
+
 def check_heading_echo(blocks, findings):
+    topic = topic_stems(blocks)
     for prev, block in zip(blocks, blocks[1:]):
-        # H3 cards are usually named after a product, and naming it first is fine.
-        if prev.kind != "heading" or prev.level > 2 or block.kind != "paragraph":
+        if prev.kind != "heading" or block.kind not in ("paragraph", "item"):
             continue
-        heading = {stem(w) for w in words(plain(prev.text)) if len(w) >= 4}
+        # Product and brand names in quotes or Latin script may open the card.
+        heading = [s for s in content_stems(QUOTED_RE.sub(" ", plain(prev.text))) if not is_topic(s, topic)]
         sentences = split_sentences(plain(block.text))
-        if len(heading) < 2 or not sentences:
+        if not heading or not sentences:
             continue
-        first = {stem(w) for w in words(sentences[0]) if len(w) >= 4}
-        if len(heading & first) / len(heading) >= 0.6:
+        roots = shared_roots(content_stems(QUOTED_RE.sub(" ", sentences[0])), heading)
+        if roots:
             findings.append(Finding("warn", "эхо заголовка", block.line, short_quote(sentences[0]),
-                                    "первая фраза повторяет заголовок — начни с ответа"))
+                                    f"первая фраза повторяет корень заголовка («{'», «'.join(r + '…' for r in roots)}») — "
+                                    "начни с ответа или новой информации"))
+
+
+def check_actors(blocks, findings):
+    for block, sentences in sentences_of(blocks):
+        for sentence in sentences:
+            for match in VAGUE_ACTOR_RE.finditer(sentence):
+                findings.append(Finding("warn", "кто действует?", block.line, match.group(0),
+                                        "размытый деятель без источника — кто именно и откуда это известно?"))
+            for clause in re.split(r"[,;]", sentence):
+                verb = IMPERSONAL_RE.search(clause)
+                if not verb:
+                    continue
+                actor = ACTOR_RE.search(clause)
+                if actor is None and not VAGUE_ACTOR_RE.search(clause):
+                    findings.append(Finding("warn", "кто действует?", block.line, short_quote(sentence),
+                                            f"«{verb.group(0)}» без деятеля — назови, кто и почему, переведи в "
+                                            "свойство предмета или обратись к читателю"))
+                elif actor is not None and not REASON_RE.search(sentence):
+                    findings.append(Finding("warn", "кто действует?", block.line, short_quote(sentence),
+                                            f"«{actor.group(0)} {verb.group(0)}» — а почему? назови причину"))
 
 
 def lint(text: str) -> list[Finding]:
@@ -423,6 +586,7 @@ def lint(text: str) -> list[Finding]:
     check_templates(blocks, findings)
     check_repeats(blocks, findings)
     check_heading_echo(blocks, findings)
+    check_actors(blocks, findings)
     findings.sort(key=lambda f: (f.level != "error", f.line, f.category))
     return findings
 

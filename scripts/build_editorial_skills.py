@@ -24,8 +24,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # (source relative to --src, destination inside the skill, skills that receive it).
 SHARED_FILES = [
     ("_shared/stop-list.md", "references/stop-list.md", ("seo-copywriter-ru", "seo-editor-ru")),
+    ("_shared/phrase.md", "references/phrase.md", ("seo-copywriter-ru", "seo-editor-ru")),
+    ("_shared/meaning.md", "references/meaning.md", ("seo-copywriter-ru", "seo-editor-ru")),
+    ("_shared/self-check.md", "references/self-check.md", ("seo-copywriter-ru", "seo-editor-ru")),
+    ("_shared/norms-2026.md", "references/norms-2026.md", ("seo-copywriter-ru", "seo-editor-ru")),
     ("seo-copywriter-ru/scripts/text_stats.py", "scripts/text_stats.py", ("seo-editor-ru",)),
     ("seo-copywriter-ru/scripts/lint_text.py", "scripts/lint_text.py", ("seo-editor-ru",)),
+    ("seo-copywriter-ru/scripts/outline.py", "scripts/outline.py", ("seo-editor-ru",)),
     ("seo-copywriter-ru/references/craft.md", "references/craft.md", ("seo-editor-ru",)),
     ("seo-copywriter-ru/references/case-balms.md", "references/case-balms.md", ("seo-editor-ru",)),
 ]

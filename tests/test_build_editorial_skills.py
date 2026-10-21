@@ -51,6 +51,12 @@ def test_build_real_skills(tmp_path):
     assert "seo-copywriter-ru/references/stop-list.md" in names["seo-copywriter-ru"]
     assert "seo-editor-ru/references/stop-list.md" in names["seo-editor-ru"]
     assert not any(n.endswith("stop-list.md") for n in names["seo-fresh-reader-ru"])
+    for shared in ("phrase.md", "self-check.md", "norms-2026.md"):
+        assert f"seo-copywriter-ru/references/{shared}" in names["seo-copywriter-ru"]
+        assert f"seo-editor-ru/references/{shared}" in names["seo-editor-ru"]
+    assert "seo-copywriter-ru/references/meaning.md" in names["seo-copywriter-ru"]
+    assert "seo-editor-ru/references/meaning.md" in names["seo-editor-ru"]
+    assert "seo-editor-ru/scripts/outline.py" in names["seo-editor-ru"]
     assert "seo-editor-ru/scripts/text_stats.py" in names["seo-editor-ru"]
     assert "seo-editor-ru/scripts/lint_text.py" in names["seo-editor-ru"]
 
@@ -242,3 +248,41 @@ def test_text_stats_missing_file(tmp_path):
     result = run_stats(str(tmp_path / "nope.md"))
     assert result.returncode == 2
     assert result.stderr
+
+
+# --- outline.py ---
+
+OUTLINE_SCRIPT = REPO_ROOT / "editorial-skills" / "seo-copywriter-ru" / "scripts" / "outline.py"
+
+
+def run_outline(*args, stdin=""):
+    return subprocess.run([sys.executable, str(OUTLINE_SCRIPT), *args],
+                          input=stdin.encode("utf-8"), capture_output=True, timeout=30)
+
+
+def test_outline_tree_shares_and_short_sections():
+    text = (
+        "# Котлы\n\nВступление о котлах. Второе предложение.\n\n"
+        "## Мощность\n\n" + "Длинный абзац о мощности котла. " * 20 + "\n\n"
+        "## Группа\n\nКороткий ввод.\n\n### Подраздел\n\nКоротко.\n\n- пункт\n- пункт\n\n"
+        "---\n\n## Заметки к сдаче\n\nНе считать.\n"
+    )
+    data = json.loads(run_outline("-", "--json", stdin=text).stdout)
+    titles = [s["title"] for s in data["sections"]]
+    assert titles == ["Котлы", "Мощность", "Группа", "Подраздел"]
+    by_title = {s["title"]: s for s in data["sections"]}
+    assert not by_title["Мощность"]["short"]
+    assert not by_title["Группа"]["short"]  # has a subsection
+    assert by_title["Подраздел"]["short"]
+    items = by_title["Подраздел"]["blocks"][1]
+    assert (items["kind"], items["count"]) == ("item", 2)
+    assert by_title["Котлы"]["blocks"][0]["first"] == "Вступление о котлах."
+    assert sum(s["share"] for s in data["sections"]) in range(98, 103)
+
+
+def test_outline_text_report():
+    result = run_outline("-", stdin="## Раздел\n\nПервая фраза. Вторая.\n")
+    out = result.stdout.decode("utf-8")
+    assert result.returncode == 0
+    assert "## Раздел" in out and "Первая фраза." in out and "мысль: …" in out
+    assert "короче 300" in out
